@@ -10,6 +10,7 @@ import '../../data/services/supabase_service.dart';
 import '../../domain/entities/education_entities.dart';
 import '../../domain/repositories/student_management_repository.dart';
 import '../../domain/services/necta_olevel_calculator.dart';
+import '../../domain/services/necta_olevel_subjects.dart';
 
 final Provider<StudentManagementRepository>
 studentManagementRepositoryProvider = Provider<StudentManagementRepository>((
@@ -188,6 +189,10 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
       debugPrint('Supabase school data hydration failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
+  }
+
+  Future<void> refreshData() async {
+    await _hydrateFromSupabase();
   }
 
   Future<void> signInWithEmailAndPassword({
@@ -1267,23 +1272,8 @@ List<SubjectResult> _buildDefaultSubjects(
   int index, {
   List<String> selectedSubjects = const <String>[],
 }) {
-  const List<String> defaultSubjects = <String>[
-    'Civics',
-    'History',
-    'Geography',
-    'Kiswahili',
-    'English Language',
-    'Computer Science',
-    'Business Studies',
-    'Historia ya Tanzania na Maadili',
-    'Biology',
-    'Basic Mathematics',
-    'Physics',
-    'Chemistry',
-  ];
-
   final List<String> sourceSubjects = selectedSubjects.isEmpty
-      ? defaultSubjects
+      ? kNectaOLevelDefaultSubjectNames
       : selectedSubjects;
 
   return sourceSubjects.asMap().entries.map((MapEntry<int, String> entry) {

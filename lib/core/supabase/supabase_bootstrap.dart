@@ -3,14 +3,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseBootstrap {
   static Future<void> initialize({String? url, String? anonKey}) async {
-    final String resolvedUrl =
-        (url != null && url.trim().isNotEmpty)
-            ? url.trim()
-            : const String.fromEnvironment('SUPABASE_URL');
+    final String resolvedUrl = (url != null && url.trim().isNotEmpty)
+        ? url.trim()
+        : const String.fromEnvironment('SUPABASE_URL');
     final String resolvedAnonKey =
         (anonKey != null && anonKey.trim().isNotEmpty)
-            ? anonKey.trim()
-            : const String.fromEnvironment('SUPABASE_ANON_KEY');
+        ? anonKey.trim()
+        : const String.fromEnvironment('SUPABASE_ANON_KEY');
 
     if (resolvedUrl.isEmpty || resolvedAnonKey.isEmpty) {
       debugPrint(
@@ -22,7 +21,13 @@ class SupabaseBootstrap {
     }
 
     try {
-      await Supabase.initialize(url: resolvedUrl, anonKey: resolvedAnonKey);
+      await Supabase.initialize(
+        url: resolvedUrl,
+        anonKey: resolvedAnonKey,
+        authOptions: const FlutterAuthClientOptions(
+          localStorage: EmptyLocalStorage(),
+        ),
+      );
     } on Exception catch (error, stackTrace) {
       debugPrint('Supabase initialization skipped: $error');
       debugPrintStack(stackTrace: stackTrace);

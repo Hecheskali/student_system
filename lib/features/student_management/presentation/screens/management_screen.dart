@@ -2384,6 +2384,8 @@ class _SubjectResultEntryWorkspaceState
             (StudentResultRecord a, StudentResultRecord b) =>
                 a.studentName.compareTo(b.studentName),
           );
+    final List<_ExistingSheetSession> availableSessions =
+        _availableSubjectSessions(classStudents);
     final int completedRows = classStudents
         .where(
           (StudentResultRecord record) =>
@@ -2441,6 +2443,11 @@ class _SubjectResultEntryWorkspaceState
                   label: 'Exam day',
                   value: formatShortDate(_selectedExamDate),
                   icon: Icons.calendar_month_rounded,
+                ),
+                _ResultEntryMetricData(
+                  label: 'Saved sessions',
+                  value: '${availableSessions.length}',
+                  icon: Icons.history_rounded,
                 ),
               ],
             ),
@@ -2529,6 +2536,20 @@ class _SubjectResultEntryWorkspaceState
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 18),
+                  _SessionHistoryPanel(
+                    sessions: availableSessions,
+                    activeSessionKey: _sheetSessionKey(
+                      subject: _selectedSubject,
+                      examType: _examType,
+                      examLabel: _examLabelController.text.trim().isEmpty
+                          ? _defaultExamLabel
+                          : _examLabelController.text.trim(),
+                      examDate: _selectedExamDate,
+                    ),
+                    onStartFresh: _startFreshSession,
+                    onEditSession: _applyExistingSession,
                   ),
                   const SizedBox(height: 18),
                   Wrap(
@@ -2650,6 +2671,8 @@ class _SubjectResultEntryWorkspaceState
                               _previewGrade(record, adminState.settings),
                           combinedScoreFor: (StudentResultRecord record) =>
                               _combinedScore(record, adminState.settings),
+                          historyFor: (StudentResultRecord record) =>
+                              _sessionHistoryFor(_subjectResultFor(record)),
                           rowStatusFor: (StudentResultRecord record) =>
                               _rowStatus(record, adminState.settings),
                           scoreControllerFor: (StudentResultRecord record) =>
@@ -2906,6 +2929,95 @@ class _SubjectResultEntryWorkspaceState
       }
     }
     return leader;
+  }
+
+  List<_ExistingSheetSession> _availableSubjectSessions(
+    List<StudentResultRecord> classStudents,
+  ) {
+    final Map<String, _ExistingSheetSession> sessions =
+        <String, _ExistingSheetSession>{};
+
+    for (final StudentResultRecord record in classStudents) {
+      final SubjectResult subjectResult = _subjectResultFor(record);
+      for (final _StudentExamSessionSummary summary in _sessionHistoryFor(
+        subjectResult,
+      )) {
+        final _ExistingSheetSession? current = sessions[summary.sessionKey];
+        final _ExistingSheetSession candidate = _ExistingSheetSession(
+          sessionKey: summary.sessionKey,
+          examLabel: summary.label,
+          examType: summary.type,
+          examDate: summary.examDate,
+          entriesCount: (current?.entriesCount ?? 0) + 1,
+          teacherName: summary.teacherName,
+        );
+        sessions[summary.sessionKey] = candidate;
+      }
+    }
+
+    final List<_ExistingSheetSession> ordered = sessions.values.toList()
+      ..sort(
+        (_ExistingSheetSession a, _ExistingSheetSession b) =>
+            b.examDate.compareTo(a.examDate),
+      );
+    return ordered;
+  }
+
+  List<_StudentExamSessionSummary> _sessionHistoryFor(SubjectResult result) {
+    final Map<String, List<ExamMark>> grouped = <String, List<ExamMark>>{};
+    for (final ExamMark mark in result.examMarks) {
+      final String key =
+          mark.sessionKey ??
+          _sheetSessionKey(
+            subject: result.subject,
+            examType: mark.type,
+            examLabel: mark.label,
+            examDate: mark.examDate ?? DateTime(2000),
+          );
+      grouped.putIfAbsent(key, () => <ExamMark>[]).add(mark);
+    }
+
+    final List<_StudentExamSessionSummary> history =
+        grouped.entries.map((MapEntry<String, List<ExamMark>> entry) {
+          final List<ExamMark> marks = entry.value;
+          final ExamMark lead = marks.first;
+          final double score =
+              marks.fold<double>(
+                0,
+                (double total, ExamMark mark) => total + mark.score,
+              ) /
+              marks.length;
+          return _StudentExamSessionSummary(
+            sessionKey: entry.key,
+            label: lead.label,
+            type: lead.type,
+            examDate: lead.examDate ?? DateTime(2000),
+            score: score,
+            componentCount: marks.length,
+            teacherName: lead.teacherName,
+          );
+        }).toList()..sort(
+          (_StudentExamSessionSummary a, _StudentExamSessionSummary b) =>
+              b.examDate.compareTo(a.examDate),
+        );
+    return history;
+  }
+
+  void _applyExistingSession(_ExistingSheetSession session) {
+    setState(() {
+      _examType = session.examType;
+      _selectedExamDate = session.examDate;
+      _examLabelController.text = session.examLabel;
+    });
+    _loadCurrentSheet();
+  }
+
+  void _startFreshSession() {
+    setState(() {
+      _selectedExamDate = DateTime.now();
+      _examLabelController.text = _defaultExamLabel;
+    });
+    _loadCurrentSheet();
   }
 
   void _registerStudentFromSheet() {
@@ -3252,10 +3364,51 @@ class _SubjectResultEntryWorkspaceState
     setState(() {
       _selectedExamDate = picked;
     });
+    _loadCurrentSheet();
   }
 }
 
 enum _EntryRowStatus { pending, partial, ready }
+
+@immutable
+class _ExistingSheetSession {
+  const _ExistingSheetSession({
+    required this.sessionKey,
+    required this.examLabel,
+    required this.examType,
+    required this.examDate,
+    required this.entriesCount,
+    this.teacherName,
+  });
+
+  final String sessionKey;
+  final String examLabel;
+  final ExamType examType;
+  final DateTime examDate;
+  final int entriesCount;
+  final String? teacherName;
+}
+
+@immutable
+class _StudentExamSessionSummary {
+  const _StudentExamSessionSummary({
+    required this.sessionKey,
+    required this.label,
+    required this.type,
+    required this.examDate,
+    required this.score,
+    required this.componentCount,
+    this.teacherName,
+  });
+
+  final String sessionKey;
+  final String label;
+  final ExamType type;
+  final DateTime examDate;
+  final double score;
+  final int componentCount;
+  final String? teacherName;
+}
 
 class _ResultEntryHeroPanel extends StatelessWidget {
   const _ResultEntryHeroPanel({
@@ -3481,6 +3634,143 @@ class _ResultEntrySurface extends StatelessWidget {
             child,
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SessionHistoryPanel extends StatelessWidget {
+  const _SessionHistoryPanel({
+    required this.sessions,
+    required this.activeSessionKey,
+    required this.onStartFresh,
+    required this.onEditSession,
+  });
+
+  final List<_ExistingSheetSession> sessions;
+  final String activeSessionKey;
+  final VoidCallback onStartFresh;
+  final ValueChanged<_ExistingSheetSession> onEditSession;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Existing exam sessions',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      sessions.isEmpty
+                          ? 'No saved sheet exists yet for this subject and class.'
+                          : 'Pick a saved session to edit its scores, or start a fresh session for the same subject.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF475569),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.tonalIcon(
+                onPressed: onStartFresh,
+                icon: const Icon(Icons.add_circle_outline_rounded),
+                label: const Text('New Session'),
+              ),
+            ],
+          ),
+          if (sessions.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: sessions.map((_ExistingSheetSession session) {
+                final bool active = session.sessionKey == activeSessionKey;
+                return InkWell(
+                  onTap: () => onEditSession(session),
+                  borderRadius: BorderRadius.circular(20),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 250,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: active ? const Color(0xFFE0EAFF) : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: active
+                            ? const Color(0xFF155EEF)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            _CompactToneBadge(
+                              label: session.examType.label,
+                              background: active
+                                  ? const Color(0xFF155EEF)
+                                  : const Color(0xFFDBEAFE),
+                              foreground: active
+                                  ? Colors.white
+                                  : const Color(0xFF1D4ED8),
+                            ),
+                            const Spacer(),
+                            if (active)
+                              const Icon(
+                                Icons.edit_rounded,
+                                color: Color(0xFF155EEF),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          session.examLabel,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${formatShortDate(session.examDate)} • ${session.entriesCount} rows',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: const Color(0xFF64748B)),
+                        ),
+                        if (session.teacherName != null) ...<Widget>[
+                          const SizedBox(height: 6),
+                          Text(
+                            session.teacherName!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: const Color(0xFF475569)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -3748,6 +4038,7 @@ class _SubjectEntryLedger extends StatelessWidget {
     required this.subjectResultsFor,
     required this.previewGradeFor,
     required this.combinedScoreFor,
+    required this.historyFor,
     required this.rowStatusFor,
     required this.scoreControllerFor,
     required this.practicalControllerFor,
@@ -3760,6 +4051,8 @@ class _SubjectEntryLedger extends StatelessWidget {
   final SubjectResult Function(StudentResultRecord record) subjectResultsFor;
   final String Function(StudentResultRecord record) previewGradeFor;
   final double? Function(StudentResultRecord record) combinedScoreFor;
+  final List<_StudentExamSessionSummary> Function(StudentResultRecord record)
+  historyFor;
   final _EntryRowStatus Function(StudentResultRecord record) rowStatusFor;
   final TextEditingController Function(StudentResultRecord record)
   scoreControllerFor;
@@ -3772,7 +4065,7 @@ class _SubjectEntryLedger extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: usesPracticals ? 1170 : 1040),
+        constraints: BoxConstraints(minWidth: usesPracticals ? 1480 : 1360),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -3790,6 +4083,10 @@ class _SubjectEntryLedger extends StatelessWidget {
                   const _LedgerHeaderCell(text: 'Previous Avg', width: 120),
                   const _LedgerHeaderCell(text: 'Grade', width: 96),
                   const _LedgerHeaderCell(text: 'Division', width: 110),
+                  const _LedgerHeaderCell(
+                    text: 'Recorded Sessions',
+                    width: 300,
+                  ),
                   _LedgerHeaderCell(
                     text: usesPracticals ? 'Theory' : 'Score',
                     width: 130,
@@ -3807,6 +4104,9 @@ class _SubjectEntryLedger extends StatelessWidget {
             ) {
               final StudentResultRecord record = entry.value;
               final SubjectResult subjectResult = subjectResultsFor(record);
+              final List<_StudentExamSessionSummary> history = historyFor(
+                record,
+              );
               final _EntryRowStatus status = rowStatusFor(record);
               final double? combinedScore = combinedScoreFor(record);
               return Padding(
@@ -3873,6 +4173,10 @@ class _SubjectEntryLedger extends StatelessWidget {
                           background: const Color(0xFFF1F5F9),
                           foreground: const Color(0xFF334155),
                         ),
+                      ),
+                      _LedgerValueCell(
+                        width: 300,
+                        child: _RecordedSessionStrip(history: history),
                       ),
                       _LedgerValueCell(
                         width: 130,
@@ -3985,6 +4289,68 @@ class _LedgerScoreInput extends StatelessWidget {
           vertical: 14,
         ),
       ),
+    );
+  }
+}
+
+class _RecordedSessionStrip extends StatelessWidget {
+  const _RecordedSessionStrip({required this.history});
+
+  final List<_StudentExamSessionSummary> history;
+
+  @override
+  Widget build(BuildContext context) {
+    if (history.isEmpty) {
+      return Text(
+        'No prior record',
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: history.take(3).map((_StudentExamSessionSummary item) {
+        final String label =
+            '${item.type.label} ${item.score.toStringAsFixed(1)}';
+        final String detail = item.componentCount > 1
+            ? '${item.label} • T+P'
+            : item.label;
+        return Tooltip(
+          message:
+              '$detail\n${formatShortDate(item.examDate)}${item.teacherName == null ? '' : '\n${item.teacherName}'}',
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

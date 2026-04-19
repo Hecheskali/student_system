@@ -9,6 +9,17 @@ import '../utils/report_exporter.dart';
 import '../widgets/motion_widgets.dart';
 import '../widgets/workspace_shell.dart';
 
+const List<String> _kDefaultResultsClasses = <String>[
+  'Form 1 A',
+  'Form 1 B',
+  'Form 2 A',
+  'Form 2 B',
+  'Form 3 A',
+  'Form 3 B',
+  'Form 4 A',
+  'Form 4 B',
+];
+
 class ResultsScreen extends ConsumerStatefulWidget {
   const ResultsScreen({super.key, this.initialClass});
 
@@ -36,11 +47,13 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
   }
 
   List<String> get _availableClasses {
-    final Set<String> classes = ref
-        .watch(schoolAdminProvider)
-        .studentResults
-        .map((StudentResultRecord record) => record.className)
-        .toSet();
+    final Set<String> classes = <String>{
+      ..._kDefaultResultsClasses,
+      ...ref
+          .watch(schoolAdminProvider)
+          .studentResults
+          .map((StudentResultRecord record) => record.className),
+    };
     return classes.toList()..sort();
   }
 
@@ -137,6 +150,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
         ),
       ],
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: <Widget>[
           _ResultsClassSelector(

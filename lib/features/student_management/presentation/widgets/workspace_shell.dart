@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_navigation_history.dart';
 import '../../domain/entities/education_entities.dart';
+import '../providers/student_management_providers.dart';
 import 'motion_widgets.dart';
 
 enum WorkspaceSection {
@@ -20,7 +24,7 @@ enum WorkspaceSection {
   settings,
 }
 
-class WorkspaceShell extends StatefulWidget {
+class WorkspaceShell extends ConsumerStatefulWidget {
   const WorkspaceShell({
     super.key,
     required this.currentSection,
@@ -45,16 +49,22 @@ class WorkspaceShell extends StatefulWidget {
   final List<Map<String, String>> breadcrumbs;
 
   @override
-  State<WorkspaceShell> createState() => _WorkspaceShellState();
+  ConsumerState<WorkspaceShell> createState() => _WorkspaceShellState();
 }
 
-class _WorkspaceShellState extends State<WorkspaceShell> {
+class _WorkspaceShellState extends ConsumerState<WorkspaceShell> {
+  static const Duration _idleTimeout = Duration(minutes: 15);
+
   late final TextEditingController _searchController;
+  Timer? _idleTimer;
+  bool _isLoggingOut = false;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController(text: widget.searchInitialValue);
+    _restartInactivityTimer();
   }
 
   @override
@@ -64,10 +74,15 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
         widget.searchInitialValue != _searchController.text) {
       _searchController.text = widget.searchInitialValue;
     }
+    if (widget.session?.id != oldWidget.session?.id ||
+        widget.currentSection != oldWidget.currentSection) {
+      _restartInactivityTimer();
+    }
   }
 
   @override
   void dispose() {
+    _idleTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -75,96 +90,178 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
   @override
   Widget build(BuildContext context) {
     final bool wide = MediaQuery.sizeOf(context).width >= 1320;
+    final List<Widget> headerActions = <Widget>[
+      ...widget.actions,
+      if (widget.session != null)
+        FilledButton.tonalIcon(
+          onPressed: _isRefreshing ? null : _refreshWorkspace,
+          icon: _isRefreshing
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
+          label: const Text('Refresh'),
+        ),
+      if (widget.session != null)
+        FilledButton.tonalIcon(
+          onPressed: _isLoggingOut ? null : () => _performLogout(),
+          icon: const Icon(Icons.logout_rounded),
+          label: const Text('Logout'),
+        ),
+    ];
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      bottomNavigationBar: wide
-          ? null
-          : NavigationBar(
-              selectedIndex: _mobileIndex(widget.currentSection),
-              onDestinationSelected: (int index) {
-                switch (index) {
-                  case 0:
-                    context.go('/dashboard');
-                  case 1:
-                    context.go('/manage');
-                  case 2:
-                    context.go('/results');
-                  case 3:
-                    context.go('/analytics');
-                  case 4:
-                    context.go('/explorer');
-                }
-              },
-              destinations: const <NavigationDestination>[
-                NavigationDestination(
-                  icon: Icon(Icons.space_dashboard_outlined),
-                  selectedIcon: Icon(Icons.space_dashboard_rounded),
-                  label: 'Dashboard',
+    return Focus(
+      autofocus: true,
+      onKeyEvent: (FocusNode node, KeyEvent event) {
+        _registerUserActivity();
+        return KeyEventResult.ignored;
+      },
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _registerUserActivity(),
+        onPointerMove: (_) => _registerUserActivity(),
+        onPointerSignal: (_) => _registerUserActivity(),
+        child: Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          drawer: wide
+              ? null
+              : Drawer(
+                  child: SafeArea(
+                    child: _ShellSidebar(
+                      currentSection: widget.currentSection,
+                      session: widget.session,
+                      searchController: _searchController,
+                      onSearch: _handleSearch,
+                      onLogout: _isLoggingOut ? null : _performLogout,
+                      idleTimeoutLabel:
+                          '${_idleTimeout.inMinutes} min idle auto logout',
+                      compact: true,
+                    ),
+                  ),
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.edit_note_outlined),
-                  selectedIcon: Icon(Icons.edit_note_rounded),
-                  label: 'Manage',
+          bottomNavigationBar: wide
+              ? null
+              : NavigationBar(
+                  selectedIndex: _mobileIndex(widget.currentSection),
+                  onDestinationSelected: (int index) {
+                    _registerUserActivity();
+                    switch (index) {
+                      case 0:
+                        context.go('/dashboard');
+                      case 1:
+                        context.go('/manage');
+                      case 2:
+                        context.go('/results');
+                      case 3:
+                        context.go('/analytics');
+                      case 4:
+                        context.go('/explorer');
+                    }
+                  },
+                  destinations: const <NavigationDestination>[
+                    NavigationDestination(
+                      icon: Icon(Icons.space_dashboard_outlined),
+                      selectedIcon: Icon(Icons.space_dashboard_rounded),
+                      label: 'Dashboard',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.edit_note_outlined),
+                      selectedIcon: Icon(Icons.edit_note_rounded),
+                      label: 'Manage',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.fact_check_outlined),
+                      selectedIcon: Icon(Icons.fact_check_rounded),
+                      label: 'Results',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.analytics_outlined),
+                      selectedIcon: Icon(Icons.analytics_rounded),
+                      label: 'Analytics',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.account_tree_outlined),
+                      selectedIcon: Icon(Icons.account_tree_rounded),
+                      label: 'Explorer',
+                    ),
+                  ],
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.fact_check_outlined),
-                  selectedIcon: Icon(Icons.fact_check_rounded),
-                  label: 'Results',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.analytics_outlined),
-                  selectedIcon: Icon(Icons.analytics_rounded),
-                  label: 'Analytics',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.account_tree_outlined),
-                  selectedIcon: Icon(Icons.account_tree_rounded),
-                  label: 'Explorer',
+          body: SafeArea(
+            child: Row(
+              children: <Widget>[
+                if (wide)
+                  _ShellSidebar(
+                    currentSection: widget.currentSection,
+                    session: widget.session,
+                    searchController: _searchController,
+                    onSearch: _handleSearch,
+                    onLogout: _isLoggingOut ? null : _performLogout,
+                    idleTimeoutLabel:
+                        '${_idleTimeout.inMinutes} min idle auto logout',
+                  ),
+                Expanded(
+                  child: Column(
+                    children: <Widget>[
+                      RevealMotion(
+                        delay: const Duration(milliseconds: 40),
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            wide ? 12 : 20,
+                            20,
+                            20,
+                            12,
+                          ),
+                          child: _ShellHeader(
+                            eyebrow: widget.eyebrow,
+                            title: widget.title,
+                            subtitle: widget.subtitle,
+                            actions: headerActions,
+                            searchController: _searchController,
+                            onSearch: _handleSearch,
+                            breadcrumbs: widget.breadcrumbs,
+                            showNavigationMenu: !wide,
+                            onOpenNavigationMenu: () =>
+                                Scaffold.of(context).openDrawer(),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: RevealMotion(
+                          delay: const Duration(milliseconds: 120),
+                          child: widget.session == null
+                              ? widget.child
+                              : RefreshIndicator.adaptive(
+                                  onRefresh: _refreshWorkspace,
+                                  child: widget.child,
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-      body: SafeArea(
-        child: Row(
-          children: <Widget>[
-            if (wide)
-              _ShellSidebar(
-                currentSection: widget.currentSection,
-                session: widget.session,
-                searchController: _searchController,
-                onSearch: _handleSearch,
-              ),
-            Expanded(
-              child: Column(
-                children: <Widget>[
-                  RevealMotion(
-                    delay: const Duration(milliseconds: 40),
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(wide ? 12 : 20, 20, 20, 12),
-                      child: _ShellHeader(
-                        eyebrow: widget.eyebrow,
-                        title: widget.title,
-                        subtitle: widget.subtitle,
-                        actions: widget.actions,
-                        searchController: _searchController,
-                        onSearch: _handleSearch,
-                        breadcrumbs: widget.breadcrumbs,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: RevealMotion(
-                      delay: const Duration(milliseconds: 120),
-                      child: widget.child,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  void _registerUserActivity() {
+    if (widget.session == null || _isLoggingOut) {
+      return;
+    }
+    _restartInactivityTimer();
+  }
+
+  void _restartInactivityTimer() {
+    _idleTimer?.cancel();
+    if (widget.session == null) {
+      return;
+    }
+    _idleTimer = Timer(_idleTimeout, () => _performLogout(automatic: true));
   }
 
   int _mobileIndex(WorkspaceSection section) {
@@ -197,12 +294,64 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
   }
 
   void _handleSearch() {
+    _registerUserActivity();
     final String query = _searchController.text.trim();
     if (query.isEmpty) {
       return;
     }
 
     context.go('/search?query=${Uri.encodeComponent(query)}');
+  }
+
+  Future<void> _refreshWorkspace() async {
+    if (!mounted || widget.session == null || _isRefreshing) {
+      return;
+    }
+    _registerUserActivity();
+    final SchoolAdminController controller = ref.read(
+      schoolAdminProvider.notifier,
+    );
+    if (!controller.hasLiveBackend) {
+      return;
+    }
+
+    setState(() {
+      _isRefreshing = true;
+    });
+    try {
+      await controller.refreshData();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
+  }
+
+  void _performLogout({bool automatic = false}) {
+    if (!mounted || widget.session == null || _isLoggingOut) {
+      return;
+    }
+
+    _isLoggingOut = true;
+    _idleTimer?.cancel();
+    ref.read(schoolAdminProvider.notifier).logout();
+
+    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(
+      context,
+    );
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(
+          automatic
+              ? 'You were logged out after ${_idleTimeout.inMinutes} minutes of inactivity.'
+              : 'You have been logged out securely.',
+        ),
+      ),
+    );
+
+    context.go('/login');
   }
 }
 
@@ -215,6 +364,8 @@ class _ShellHeader extends StatelessWidget {
     required this.searchController,
     required this.onSearch,
     required this.breadcrumbs,
+    this.showNavigationMenu = false,
+    this.onOpenNavigationMenu,
   });
 
   final String eyebrow;
@@ -224,6 +375,8 @@ class _ShellHeader extends StatelessWidget {
   final TextEditingController searchController;
   final VoidCallback onSearch;
   final List<Map<String, String>> breadcrumbs;
+  final bool showNavigationMenu;
+  final VoidCallback? onOpenNavigationMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -249,6 +402,12 @@ class _ShellHeader extends StatelessWidget {
                       spacing: 10,
                       runSpacing: 10,
                       children: <Widget>[
+                        if (showNavigationMenu)
+                          FilledButton.tonalIcon(
+                            onPressed: onOpenNavigationMenu,
+                            icon: const Icon(Icons.menu_rounded),
+                            label: const Text('Menu'),
+                          ),
                         FilledButton.tonalIcon(
                           onPressed: AppNavigationHistory.instance.canGoBack
                               ? () =>
@@ -394,21 +553,29 @@ class _ShellSidebar extends StatelessWidget {
     required this.session,
     required this.searchController,
     required this.onSearch,
+    required this.onLogout,
+    required this.idleTimeoutLabel,
+    this.compact = false,
   });
 
   final WorkspaceSection currentSection;
   final SessionUser? session;
   final TextEditingController searchController;
   final VoidCallback onSearch;
+  final VoidCallback? onLogout;
+  final String idleTimeoutLabel;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 300,
-      margin: const EdgeInsets.fromLTRB(20, 20, 0, 20),
+      width: compact ? double.infinity : 300,
+      margin: compact
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(20, 20, 0, 20),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(compact ? 0 : 32),
         gradient: const LinearGradient(
           colors: <Color>[
             Color(0xFF0F172A),
@@ -537,8 +704,8 @@ class _ShellSidebar extends StatelessWidget {
                       delay: const Duration(milliseconds: 100),
                       child: _SidebarItem(
                         icon: Icons.edit_note_rounded,
-                        title: 'Result Entry',
-                        subtitle: 'Upload marks & manage results',
+                        title: 'School Operations',
+                        subtitle: 'Intake, teachers, and upload flow',
                         active: currentSection == WorkspaceSection.operations,
                         onTap: () => context.go('/manage'),
                       ),
@@ -665,6 +832,33 @@ class _ShellSidebar extends StatelessWidget {
                                 ?.copyWith(
                                   color: Colors.white.withValues(alpha: 0.82),
                                 ),
+                          ),
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: <Widget>[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  idleTimeoutLabel,
+                                  style: Theme.of(context).textTheme.labelLarge
+                                      ?.copyWith(color: Colors.white),
+                                ),
+                              ),
+                              FilledButton.tonalIcon(
+                                onPressed: onLogout,
+                                icon: const Icon(Icons.logout_rounded),
+                                label: const Text('Logout'),
+                              ),
+                            ],
                           ),
                         ],
                       ),

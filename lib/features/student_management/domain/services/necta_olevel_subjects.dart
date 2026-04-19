@@ -119,7 +119,7 @@ const List<NectaOLevelSubjectDefinition> kNectaOLevelSubjects =
         category: NectaOLevelSubjectCategory.optionalTechnical,
       ),
       NectaOLevelSubjectDefinition(
-        name: 'Physical Education',
+        name: 'Physics',
         category: NectaOLevelSubjectCategory.optionalTechnical,
       ),
       NectaOLevelSubjectDefinition(
@@ -131,11 +131,11 @@ const List<NectaOLevelSubjectDefinition> kNectaOLevelSubjects =
         category: NectaOLevelSubjectCategory.optionalTechnical,
       ),
       NectaOLevelSubjectDefinition(
-        name: 'Home Economics',
+        name: 'Historia ya Tanzania na Maadili',
         category: NectaOLevelSubjectCategory.optionalTechnical,
       ),
       NectaOLevelSubjectDefinition(
-        name: 'Engineering Sciences',
+        name: 'Business Studies',
         category: NectaOLevelSubjectCategory.optionalTechnical,
       ),
     ];
@@ -149,9 +149,17 @@ final List<String> kNectaOLevelCompulsorySubjectNames = kNectaOLevelSubjects
     .map((NectaOLevelSubjectDefinition subject) => subject.name)
     .toList(growable: false);
 
-final List<String> kNectaOLevelDefaultSubjectNames =
-    <String>[
-      ...kNectaOLevelCompulsorySubjectNames,
-      'Physics',
-      'Chemistry',
-    ];
+const List<String> kNectaOLevelDefaultSubjectNames = <String>[
+  'Civics',
+  'History',
+  'Geography',
+  'Kiswahili',
+  'English Language',
+  'Computer Science',
+  'Business Studies',
+  'Historia ya Tanzania na Maadili',
+  'Biology',
+  'Basic Mathematics',
+  'Physics',
+  'Chemistry',
+];

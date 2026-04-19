@@ -81,9 +81,9 @@ class _ResultEntryScreenState extends ConsumerState<ResultEntryScreen> {
     return WorkspaceShell(
       currentSection: WorkspaceSection.resultEntry,
       session: session,
-      title: 'Subject Result Entry',
+      title: 'Professional Result Entry',
       subtitle:
-          'Start with the class, then open the professional marksheet for subject score entry, grade checks, divisions, and live class analysis.',
+          'Open the class-first marksheet with saved exam sessions, inline score editing, live grade checks, and the full subject record visible while you work.',
       breadcrumbs: breadcrumbs,
       actions: <Widget>[
         FilledButton.tonalIcon(
