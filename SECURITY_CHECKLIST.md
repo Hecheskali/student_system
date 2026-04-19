@@ -97,7 +97,7 @@
 
 - [ ] Set `.env` variables for production:
 
-  ```
+  ```env
   APP_ENV=production
   APP_DEBUG=false
   JWT_SECRET_KEY=<64-char-random-key>
@@ -134,7 +134,7 @@
   - Usage: `SecureTokenStorage.saveAccessToken(token)`
   - Features: Encrypted at rest, device-only access
 
-### Network Security
+### Frontend Network Security
 
 - [x] Certificate Pinning
   - Location: `lib/core/security/certificate_pinning.dart`

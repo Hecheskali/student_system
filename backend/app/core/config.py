@@ -163,17 +163,32 @@ class Settings(BaseSettings):
         default=None,
         alias="SUPABASE_SERVICE_ROLE_KEY",
     )
-    email_provider: str = Field(default="log", alias="EMAIL_PROVIDER")
+    email_provider: str = Field(default="resend", alias="EMAIL_PROVIDER")
     email_from_address: str = Field(
         default="noreply@student-system.local",
         alias="EMAIL_FROM_ADDRESS",
     )
+    # Resend API for email delivery (modern, reliable email service)
+    resend_api_key: SecretStr | None = Field(
+        default=None,
+        alias="RESEND_API_KEY",
+    )
+    # Legacy SMTP settings (for backward compatibility)
     smtp_host: str | None = Field(default=None, alias="SMTP_HOST")
     smtp_port: int = Field(default=587, alias="SMTP_PORT")
     smtp_username: str | None = Field(default=None, alias="SMTP_USERNAME")
     smtp_password: SecretStr | None = Field(default=None, alias="SMTP_PASSWORD")
     smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
-    sms_provider: str = Field(default="log", alias="SMS_PROVIDER")
+    # SMS provider settings
+    sms_provider: str = Field(default="vonage", alias="SMS_PROVIDER")
+    # Vonage SMS API (formerly Nexmo)
+    vonage_api_key: str | None = Field(default=None, alias="VONAGE_API_KEY")
+    vonage_api_secret: SecretStr | None = Field(
+        default=None,
+        alias="VONAGE_API_SECRET",
+    )
+    vonage_from_number: str | None = Field(default=None, alias="VONAGE_FROM_NUMBER")
+    # Legacy Twilio settings (for backward compatibility)
     twilio_account_sid: str | None = Field(default=None, alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: SecretStr | None = Field(
         default=None,

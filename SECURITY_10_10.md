@@ -64,7 +64,7 @@ decrypted = encryption_manager.decrypt(encrypted)
 ### 6. **Security Headers** ✅
 
 | Header | Value | Protection |
-|--------|-------|-----------|
+| --- | --- | --- |
 | X-Content-Type-Options | nosniff | MIME sniffing attacks |
 | X-Frame-Options | DENY | Clickjacking attacks |
 | Content-Security-Policy | strict | XSS and data injection |
@@ -286,7 +286,7 @@ dependencies:
 ## Common Attack Prevention Matrix
 
 | Attack Type | Backend Protection | Frontend Protection | Status |
-|-------------|-------------------|-------------------|--------|
+| --- | --- | --- | --- |
 | SQL Injection | Input sanitization, parameterized queries | Parameterized DB | ✅ |
 | XSS | CSP headers, input validation | N/A (Flutter) | ✅ |
 | CSRF | CSRF tokens, SameSite cookies | Request signing | ✅ |
