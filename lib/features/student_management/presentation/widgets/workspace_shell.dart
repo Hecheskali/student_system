@@ -1,0 +1,856 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/router/app_navigation_history.dart';
+import '../../domain/entities/education_entities.dart';
+import 'motion_widgets.dart';
+
+enum WorkspaceSection {
+  dashboard,
+  studentIntake,
+  operations,
+  records,
+  results,
+  allResults,
+  analytics,
+  resultEntry,
+  explorer,
+  search,
+  profiles,
+  settings,
+}
+
+class WorkspaceShell extends StatefulWidget {
+  const WorkspaceShell({
+    super.key,
+    required this.currentSection,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+    required this.session,
+    this.actions = const <Widget>[],
+    this.searchInitialValue = '',
+    this.eyebrow = 'School Operations',
+    this.breadcrumbs = const <Map<String, String>>[],
+  });
+
+  final WorkspaceSection currentSection;
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+  final Widget child;
+  final SessionUser? session;
+  final List<Widget> actions;
+  final String searchInitialValue;
+  final List<Map<String, String>> breadcrumbs;
+
+  @override
+  State<WorkspaceShell> createState() => _WorkspaceShellState();
+}
+
+class _WorkspaceShellState extends State<WorkspaceShell> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(text: widget.searchInitialValue);
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkspaceShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.searchInitialValue != oldWidget.searchInitialValue &&
+        widget.searchInitialValue != _searchController.text) {
+      _searchController.text = widget.searchInitialValue;
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool wide = MediaQuery.sizeOf(context).width >= 1320;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      bottomNavigationBar: wide
+          ? null
+          : NavigationBar(
+              selectedIndex: _mobileIndex(widget.currentSection),
+              onDestinationSelected: (int index) {
+                switch (index) {
+                  case 0:
+                    context.go('/dashboard');
+                  case 1:
+                    context.go('/manage');
+                  case 2:
+                    context.go('/results');
+                  case 3:
+                    context.go('/analytics');
+                  case 4:
+                    context.go('/explorer');
+                }
+              },
+              destinations: const <NavigationDestination>[
+                NavigationDestination(
+                  icon: Icon(Icons.space_dashboard_outlined),
+                  selectedIcon: Icon(Icons.space_dashboard_rounded),
+                  label: 'Dashboard',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.edit_note_outlined),
+                  selectedIcon: Icon(Icons.edit_note_rounded),
+                  label: 'Manage',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.fact_check_outlined),
+                  selectedIcon: Icon(Icons.fact_check_rounded),
+                  label: 'Results',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.analytics_outlined),
+                  selectedIcon: Icon(Icons.analytics_rounded),
+                  label: 'Analytics',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.account_tree_outlined),
+                  selectedIcon: Icon(Icons.account_tree_rounded),
+                  label: 'Explorer',
+                ),
+              ],
+            ),
+      body: SafeArea(
+        child: Row(
+          children: <Widget>[
+            if (wide)
+              _ShellSidebar(
+                currentSection: widget.currentSection,
+                session: widget.session,
+                searchController: _searchController,
+                onSearch: _handleSearch,
+              ),
+            Expanded(
+              child: Column(
+                children: <Widget>[
+                  RevealMotion(
+                    delay: const Duration(milliseconds: 40),
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(wide ? 12 : 20, 20, 20, 12),
+                      child: _ShellHeader(
+                        eyebrow: widget.eyebrow,
+                        title: widget.title,
+                        subtitle: widget.subtitle,
+                        actions: widget.actions,
+                        searchController: _searchController,
+                        onSearch: _handleSearch,
+                        breadcrumbs: widget.breadcrumbs,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: RevealMotion(
+                      delay: const Duration(milliseconds: 120),
+                      child: widget.child,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  int _mobileIndex(WorkspaceSection section) {
+    switch (section) {
+      case WorkspaceSection.dashboard:
+        return 0;
+      case WorkspaceSection.studentIntake:
+        return 1;
+      case WorkspaceSection.operations:
+        return 1;
+      case WorkspaceSection.records:
+        return 1;
+      case WorkspaceSection.results:
+        return 2;
+      case WorkspaceSection.allResults:
+        return 2;
+      case WorkspaceSection.analytics:
+        return 3;
+      case WorkspaceSection.resultEntry:
+        return 2;
+      case WorkspaceSection.explorer:
+        return 4;
+      case WorkspaceSection.search:
+        return 1;
+      case WorkspaceSection.profiles:
+        return 1;
+      case WorkspaceSection.settings:
+        return 1;
+    }
+  }
+
+  void _handleSearch() {
+    final String query = _searchController.text.trim();
+    if (query.isEmpty) {
+      return;
+    }
+
+    context.go('/search?query=${Uri.encodeComponent(query)}');
+  }
+}
+
+class _ShellHeader extends StatelessWidget {
+  const _ShellHeader({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+    required this.actions,
+    required this.searchController,
+    required this.onSearch,
+    required this.breadcrumbs,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+  final List<Widget> actions;
+  final TextEditingController searchController;
+  final VoidCallback onSearch;
+  final List<Map<String, String>> breadcrumbs;
+
+  @override
+  Widget build(BuildContext context) {
+    final double width = MediaQuery.sizeOf(context).width;
+    final bool compact = width < 1100 || (actions.length > 1 && width < 1320);
+    final GoRouter router = GoRouter.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFE8EDF5)),
+      ),
+      child: compact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                AnimatedBuilder(
+                  animation: AppNavigationHistory.instance,
+                  builder: (BuildContext context, Widget? child) {
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: <Widget>[
+                        FilledButton.tonalIcon(
+                          onPressed: AppNavigationHistory.instance.canGoBack
+                              ? () =>
+                                    AppNavigationHistory.instance.goBack(router)
+                              : null,
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          label: const Text('Back'),
+                        ),
+                        FilledButton.tonalIcon(
+                          onPressed: AppNavigationHistory.instance.canGoForward
+                              ? () => AppNavigationHistory.instance.goForward(
+                                  router,
+                                )
+                              : null,
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                          label: const Text('Forward'),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                if (breadcrumbs.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 16),
+                  _BreadcrumbTrail(breadcrumbs: breadcrumbs),
+                ],
+                const SizedBox(height: 16),
+                _HeaderCopy(eyebrow: eyebrow, title: title, subtitle: subtitle),
+                const SizedBox(height: 16),
+                _SearchBar(controller: searchController, onSearch: onSearch),
+                if (actions.isNotEmpty) const SizedBox(height: 16),
+                if (actions.isNotEmpty)
+                  Wrap(spacing: 12, runSpacing: 12, children: actions),
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  flex: 6,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      AnimatedBuilder(
+                        animation: AppNavigationHistory.instance,
+                        builder: (BuildContext context, Widget? child) {
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: <Widget>[
+                              FilledButton.tonalIcon(
+                                onPressed:
+                                    AppNavigationHistory.instance.canGoBack
+                                    ? () => AppNavigationHistory.instance
+                                          .goBack(router)
+                                    : null,
+                                icon: const Icon(Icons.arrow_back_rounded),
+                                label: const Text('Back'),
+                              ),
+                              FilledButton.tonalIcon(
+                                onPressed:
+                                    AppNavigationHistory.instance.canGoForward
+                                    ? () => AppNavigationHistory.instance
+                                          .goForward(router)
+                                    : null,
+                                icon: const Icon(Icons.arrow_forward_rounded),
+                                label: const Text('Forward'),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      if (breadcrumbs.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 16),
+                        _BreadcrumbTrail(breadcrumbs: breadcrumbs),
+                      ],
+                      const SizedBox(height: 16),
+                      _HeaderCopy(
+                        eyebrow: eyebrow,
+                        title: title,
+                        subtitle: subtitle,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  flex: 3,
+                  child: _SearchBar(
+                    controller: searchController,
+                    onSearch: onSearch,
+                  ),
+                ),
+                if (actions.isNotEmpty) ...<Widget>[
+                  const SizedBox(width: 18),
+                  Wrap(spacing: 12, runSpacing: 12, children: actions),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _HeaderCopy extends StatelessWidget {
+  const _HeaderCopy({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          eyebrow.toUpperCase(),
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: const Color(0xFF155EEF),
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(title, style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF475569)),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShellSidebar extends StatelessWidget {
+  const _ShellSidebar({
+    required this.currentSection,
+    required this.session,
+    required this.searchController,
+    required this.onSearch,
+  });
+
+  final WorkspaceSection currentSection;
+  final SessionUser? session;
+  final TextEditingController searchController;
+  final VoidCallback onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 300,
+      margin: const EdgeInsets.fromLTRB(20, 20, 0, 20),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        gradient: const LinearGradient(
+          colors: <Color>[
+            Color(0xFF0F172A),
+            Color(0xFF162B4D),
+            Color(0xFF155EEF),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              Icons.hub_rounded,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Student Command',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(color: Colors.white),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Production workspace',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.76,
+                                        ),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (session != null) ...<Widget>[
+                      const SizedBox(height: 18),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              session!.name,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(color: Colors.white),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${session!.role.shortLabel} • ${session!.schoolName}',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    _SearchBar(
+                      controller: searchController,
+                      onSearch: onSearch,
+                      darkMode: true,
+                    ),
+                    const SizedBox(height: 22),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 60),
+                      child: _SidebarItem(
+                        icon: Icons.space_dashboard_rounded,
+                        title: 'Dashboard',
+                        subtitle: 'School overview',
+                        active: currentSection == WorkspaceSection.dashboard,
+                        onTap: () => context.go('/dashboard'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 85),
+                      child: _SidebarItem(
+                        icon: Icons.person_add_rounded,
+                        title: 'Student Registration',
+                        subtitle: 'Add & manage student intake',
+                        active:
+                            currentSection == WorkspaceSection.studentIntake,
+                        onTap: () => context.go('/student-intake'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 100),
+                      child: _SidebarItem(
+                        icon: Icons.edit_note_rounded,
+                        title: 'Result Entry',
+                        subtitle: 'Upload marks & manage results',
+                        active: currentSection == WorkspaceSection.operations,
+                        onTap: () => context.go('/manage'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 140),
+                      child: _SidebarItem(
+                        icon: Icons.history_edu_rounded,
+                        title: 'Records',
+                        subtitle: 'Archive and registry',
+                        active: currentSection == WorkspaceSection.records,
+                        onTap: () => context.go('/records'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 180),
+                      child: _SidebarItem(
+                        icon: Icons.fact_check_rounded,
+                        title: 'Results',
+                        subtitle: 'Tables and divisions',
+                        active: currentSection == WorkspaceSection.results,
+                        onTap: () => context.go('/results'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 220),
+                      child: _SidebarItem(
+                        icon: Icons.border_color_rounded,
+                        title: 'Result Entry',
+                        subtitle: 'Dedicated subject scores',
+                        active: currentSection == WorkspaceSection.resultEntry,
+                        onTap: () => context.go('/result-entry'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 240),
+                      child: _SidebarItem(
+                        icon: Icons.table_chart_rounded,
+                        title: 'Uploaded Results',
+                        subtitle: 'Merged forms, subject rows',
+                        active: currentSection == WorkspaceSection.allResults,
+                        onTap: () => context.go('/all-results'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 280),
+                      child: _SidebarItem(
+                        icon: Icons.analytics_rounded,
+                        title: 'Analytics',
+                        subtitle: 'Student, subject, and class trends',
+                        active: currentSection == WorkspaceSection.analytics,
+                        onTap: () => context.go('/analytics'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 320),
+                      child: _SidebarItem(
+                        icon: Icons.perm_media_rounded,
+                        title: 'Profiles',
+                        subtitle: 'School and teachers',
+                        active: currentSection == WorkspaceSection.profiles,
+                        onTap: () => context.go('/profiles'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 360),
+                      child: _SidebarItem(
+                        icon: Icons.account_tree_rounded,
+                        title: 'Explorer',
+                        subtitle: 'District drill-down',
+                        active: currentSection == WorkspaceSection.explorer,
+                        onTap: () => context.go('/explorer'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 400),
+                      child: _SidebarItem(
+                        icon: Icons.manage_search_rounded,
+                        title: 'Search',
+                        subtitle: 'Students, teachers, results',
+                        active: currentSection == WorkspaceSection.search,
+                        onTap: () => context.go('/search'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 440),
+                      child: _SidebarItem(
+                        icon: Icons.settings_rounded,
+                        title: 'Settings',
+                        subtitle: 'Policies and permissions',
+                        active: currentSection == WorkspaceSection.settings,
+                        onTap: () => context.go('/settings'),
+                      ),
+                    ),
+                    const Spacer(),
+                    const SizedBox(height: 18),
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            'Platform posture',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: Colors.white),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Teachers can upload scores, headmaster can monitor every workflow, and reports can be exported from the live views.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.82),
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _BreadcrumbTrail extends StatelessWidget {
+  const _BreadcrumbTrail({required this.breadcrumbs});
+
+  final List<Map<String, String>> breadcrumbs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: <Widget>[
+        for (int i = 0; i < breadcrumbs.length; i++) ...<Widget>[
+          if (i > 0)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+              child: Icon(Icons.chevron_right_rounded, size: 16),
+            ),
+          InkWell(
+            onTap: breadcrumbs[i]['route'] != null
+                ? () => context.go(breadcrumbs[i]['route']!)
+                : null,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: breadcrumbs[i]['route'] == null
+                    ? const Color(0xFFEAF1FF)
+                    : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: breadcrumbs[i]['route'] == null
+                      ? const Color(0xFFC9DAFF)
+                      : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Text(
+                breadcrumbs[i]['label']!,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: breadcrumbs[i]['route'] == null
+                      ? const Color(0xFF155EEF)
+                      : const Color(0xFF475569),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({
+    required this.controller,
+    required this.onSearch,
+    this.darkMode = false,
+  });
+
+  final TextEditingController controller;
+  final VoidCallback onSearch;
+  final bool darkMode;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onSubmitted: (_) => onSearch(),
+      style: TextStyle(
+        color: darkMode ? Colors.white : const Color(0xFF0F172A),
+      ),
+      decoration: InputDecoration(
+        hintText: 'Search students, teachers, results, or classes',
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          color: darkMode ? Colors.white70 : const Color(0xFF64748B),
+        ),
+        suffixIcon: IconButton(
+          onPressed: onSearch,
+          icon: Icon(
+            Icons.arrow_forward_rounded,
+            color: darkMode ? Colors.white : const Color(0xFF155EEF),
+          ),
+        ),
+        fillColor: darkMode
+            ? Colors.white.withValues(alpha: 0.1)
+            : const Color(0xFFF8FAFC),
+        hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: darkMode ? Colors.white70 : const Color(0xFF64748B),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarItem extends StatelessWidget {
+  const _SidebarItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.active,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return HoverLift(
+      borderRadius: BorderRadius.circular(22),
+      shadowColor: Colors.black,
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: active
+                ? Colors.white.withValues(alpha: 0.16)
+                : Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: active
+                  ? Colors.white.withValues(alpha: 0.18)
+                  : Colors.transparent,
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: active
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(color: Colors.white),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.72),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -1,0 +1,3 @@
+-- Intentionally empty.
+-- This project now starts with real data only.
+-- Add your own inserts here only when you explicitly want seed data.
