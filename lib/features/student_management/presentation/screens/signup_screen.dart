@@ -114,7 +114,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                     ),
                                     const SizedBox(height: 10),
                                     Text(
-                                      'Teachers and headmaster can both sign up here and enter the live school workflow.',
+                                      'Teachers, academic masters, and headmasters can all sign up here and enter the school workflow.',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodyMedium
@@ -202,7 +202,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                           labelText: 'Password',
                                         ),
                                         validator: (String? value) {
-                                          if (value == null || value.length < 6) {
+                                          if (value == null ||
+                                              value.length < 6) {
                                             return 'Use at least 6 characters';
                                           }
                                           return null;
@@ -216,7 +217,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                           labelText: 'Confirm password',
                                         ),
                                         validator: (String? value) {
-                                          if (value != _passwordController.text) {
+                                          if (value !=
+                                              _passwordController.text) {
                                             return 'Passwords do not match';
                                           }
                                           return null;
@@ -310,10 +312,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                           ? const SizedBox(
                                               width: 18,
                                               height: 18,
-                                              child:
-                                                  CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                  ),
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
                                             )
                                           : const Icon(
                                               Icons.person_add_alt_1_rounded,
@@ -321,6 +322,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                       label: Text(
                                         _role == UserRole.teacher
                                             ? 'Create Teacher Account'
+                                            : _role == UserRole.academicMaster
+                                            ? 'Create Academic Master Account'
                                             : 'Create Headmaster Account',
                                       ),
                                     ),
@@ -371,7 +374,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               districtName: _districtController.text.trim(),
               subject: _role == UserRole.teacher ? _subject : null,
               assignedClass: _role == UserRole.teacher ? _assignedClass : null,
-              subjects: _role == UserRole.teacher ? <String>[_subject] : const <String>[],
+              subjects: _role == UserRole.teacher
+                  ? <String>[_subject]
+                  : const <String>[],
               assignedClasses: _role == UserRole.teacher
                   ? <String>[_assignedClass]
                   : const <String>[],
@@ -388,9 +393,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign up failed: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Sign up failed: $error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -445,6 +450,8 @@ class _SignUpIntro extends StatelessWidget {
           Text(
             role == UserRole.teacher
                 ? 'Teacher sign-up now exists in the live workflow.'
+                : role == UserRole.academicMaster
+                ? 'Academic master sign-up now supports the full reporting workflow.'
                 : 'Headmaster sign-up now leads the full monitoring workflow.',
             style: Theme.of(
               context,
@@ -454,6 +461,8 @@ class _SignUpIntro extends StatelessWidget {
           Text(
             role == UserRole.teacher
                 ? 'Create teacher access, assign a subject and class, then start uploading student scores from the reporting pages.'
+                : role == UserRole.academicMaster
+                ? 'Create the academic master account and move directly into exam supervision, result review, and reporting coordination.'
                 : 'Create the headmaster account and move directly into school-wide supervision, permissions, division summaries, and reporting analytics.',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: Colors.white.withValues(alpha: 0.82),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../../core/supabase/supabase_bootstrap.dart';
 import '../../data/repositories/supabase_student_management_repository.dart';
@@ -24,36 +25,33 @@ final FutureProvider<List<District>> districtsProvider =
       return ref.watch(studentManagementRepositoryProvider).getDistricts();
     });
 
-final FutureProviderFamily<List<School>, String> schoolsProvider =
-    FutureProvider.family<List<School>, String>((Ref ref, String districtId) {
-      return ref
-          .watch(studentManagementRepositoryProvider)
-          .getSchools(districtId);
-    });
+final schoolsProvider = FutureProvider.family<List<School>, String>((
+  Ref ref,
+  String districtId,
+) {
+  return ref.watch(studentManagementRepositoryProvider).getSchools(districtId);
+});
 
-final FutureProviderFamily<List<SchoolClass>, String> classesProvider =
-    FutureProvider.family<List<SchoolClass>, String>((
-      Ref ref,
-      String schoolId,
-    ) {
-      return ref
-          .watch(studentManagementRepositoryProvider)
-          .getClasses(schoolId);
-    });
+final classesProvider = FutureProvider.family<List<SchoolClass>, String>((
+  Ref ref,
+  String schoolId,
+) {
+  return ref.watch(studentManagementRepositoryProvider).getClasses(schoolId);
+});
 
-final FutureProviderFamily<List<Student>, String> studentsProvider =
-    FutureProvider.family<List<Student>, String>((Ref ref, String classId) {
-      return ref
-          .watch(studentManagementRepositoryProvider)
-          .getStudents(classId);
-    });
+final studentsProvider = FutureProvider.family<List<Student>, String>((
+  Ref ref,
+  String classId,
+) {
+  return ref.watch(studentManagementRepositoryProvider).getStudents(classId);
+});
 
-final FutureProviderFamily<Student?, String> studentProvider =
-    FutureProvider.family<Student?, String>((Ref ref, String studentId) {
-      return ref
-          .watch(studentManagementRepositoryProvider)
-          .getStudent(studentId);
-    });
+final studentProvider = FutureProvider.family<Student?, String>((
+  Ref ref,
+  String studentId,
+) {
+  return ref.watch(studentManagementRepositoryProvider).getStudent(studentId);
+});
 
 final FutureProvider<DashboardSummary> dashboardSummaryProvider =
     FutureProvider<DashboardSummary>((Ref ref) {
@@ -62,15 +60,14 @@ final FutureProvider<DashboardSummary> dashboardSummaryProvider =
           .getDashboardSummary();
     });
 
-final FutureProviderFamily<ScopeSummary, ScopeRequest> scopeSummaryProvider =
-    FutureProvider.family<ScopeSummary, ScopeRequest>((
-      Ref ref,
-      ScopeRequest request,
-    ) {
-      return ref
-          .watch(studentManagementRepositoryProvider)
-          .getScopeSummary(request);
-    });
+final scopeSummaryProvider = FutureProvider.family<ScopeSummary, ScopeRequest>((
+  Ref ref,
+  ScopeRequest request,
+) {
+  return ref
+      .watch(studentManagementRepositoryProvider)
+      .getScopeSummary(request);
+});
 
 final Provider<SupabaseService?> supabaseServiceProvider =
     Provider<SupabaseService?>((Ref ref) {
@@ -120,37 +117,41 @@ final Provider<TeacherAccount?> currentTeacherProvider =
       return null;
     });
 
-final ProviderFamily<StudentResultRecord?, String> studentResultProvider =
-    Provider.family<StudentResultRecord?, String>((Ref ref, String studentId) {
-      final List<StudentResultRecord> results = ref
-          .watch(schoolAdminProvider)
-          .studentResults;
+final studentResultProvider = Provider.family<StudentResultRecord?, String>((
+  Ref ref,
+  String studentId,
+) {
+  final List<StudentResultRecord> results = ref
+      .watch(schoolAdminProvider)
+      .studentResults;
 
-      for (final StudentResultRecord record in results) {
-        if (record.id == studentId) {
-          return record;
-        }
-      }
+  for (final StudentResultRecord record in results) {
+    if (record.id == studentId) {
+      return record;
+    }
+  }
 
-      return null;
-    });
+  return null;
+});
 
-final ProviderFamily<List<SearchResultItem>, String> searchResultsProvider =
-    Provider.family<List<SearchResultItem>, String>((Ref ref, String query) {
-      final String normalized = query.trim().toLowerCase();
-      if (normalized.isEmpty) {
-        return const <SearchResultItem>[];
-      }
+final searchResultsProvider = Provider.family<List<SearchResultItem>, String>((
+  Ref ref,
+  String query,
+) {
+  final String normalized = query.trim().toLowerCase();
+  if (normalized.isEmpty) {
+    return const <SearchResultItem>[];
+  }
 
-      return _buildSearchIndex(
-        state: ref.watch(schoolAdminProvider),
-        overview: ref.watch(schoolOverviewProvider),
-      ).where((SearchResultItem item) {
-        final String haystack =
-            '${item.title} ${item.subtitle} ${item.type.label}'.toLowerCase();
-        return haystack.contains(normalized);
-      }).toList();
-    });
+  return _buildSearchIndex(
+    state: ref.watch(schoolAdminProvider),
+    overview: ref.watch(schoolOverviewProvider),
+  ).where((SearchResultItem item) {
+    final String haystack = '${item.title} ${item.subtitle} ${item.type.label}'
+        .toLowerCase();
+    return haystack.contains(normalized);
+  }).toList();
+});
 
 class SchoolAdminController extends StateNotifier<SchoolAdminState> {
   SchoolAdminController({SupabaseSchoolAdminStore? store})

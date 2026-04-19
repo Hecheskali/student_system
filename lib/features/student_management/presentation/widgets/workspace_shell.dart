@@ -55,6 +55,7 @@ class WorkspaceShell extends ConsumerStatefulWidget {
 class _WorkspaceShellState extends ConsumerState<WorkspaceShell> {
   static const Duration _idleTimeout = Duration(minutes: 15);
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late final TextEditingController _searchController;
   Timer? _idleTimer;
   bool _isLoggingOut = false;
@@ -124,6 +125,7 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell> {
         onPointerMove: (_) => _registerUserActivity(),
         onPointerSignal: (_) => _registerUserActivity(),
         child: Scaffold(
+          key: _scaffoldKey,
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           drawer: wide
               ? null
@@ -157,7 +159,7 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell> {
                       case 3:
                         context.go('/analytics');
                       case 4:
-                        context.go('/explorer');
+                        _openNavigationDrawer();
                     }
                   },
                   destinations: const <NavigationDestination>[
@@ -182,9 +184,9 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell> {
                       label: 'Analytics',
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.account_tree_outlined),
-                      selectedIcon: Icon(Icons.account_tree_rounded),
-                      label: 'Explorer',
+                      icon: Icon(Icons.menu_open_rounded),
+                      selectedIcon: Icon(Icons.menu_rounded),
+                      label: 'More',
                     ),
                   ],
                 ),
@@ -222,8 +224,7 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell> {
                             onSearch: _handleSearch,
                             breadcrumbs: widget.breadcrumbs,
                             showNavigationMenu: !wide,
-                            onOpenNavigationMenu: () =>
-                                Scaffold.of(context).openDrawer(),
+                            onOpenNavigationMenu: _openNavigationDrawer,
                           ),
                         ),
                       ),
@@ -281,16 +282,20 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell> {
       case WorkspaceSection.analytics:
         return 3;
       case WorkspaceSection.resultEntry:
-        return 2;
+        return 4;
       case WorkspaceSection.explorer:
         return 4;
       case WorkspaceSection.search:
-        return 1;
+        return 4;
       case WorkspaceSection.profiles:
-        return 1;
+        return 4;
       case WorkspaceSection.settings:
-        return 1;
+        return 4;
     }
+  }
+
+  void _openNavigationDrawer() {
+    _scaffoldKey.currentState?.openDrawer();
   }
 
   void _handleSearch() {
@@ -382,10 +387,14 @@ class _ShellHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final double width = MediaQuery.sizeOf(context).width;
     final bool compact = width < 1100 || (actions.length > 1 && width < 1320);
+    final bool extraCompact = width < 520;
     final GoRouter router = GoRouter.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: EdgeInsets.symmetric(
+        horizontal: extraCompact ? 16 : 20,
+        vertical: extraCompact ? 14 : 18,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(28),
@@ -403,27 +412,30 @@ class _ShellHeader extends StatelessWidget {
                       runSpacing: 10,
                       children: <Widget>[
                         if (showNavigationMenu)
-                          FilledButton.tonalIcon(
+                          _HeaderToolbarButton(
+                            icon: Icons.menu_rounded,
+                            label: 'Menu',
+                            compact: extraCompact,
                             onPressed: onOpenNavigationMenu,
-                            icon: const Icon(Icons.menu_rounded),
-                            label: const Text('Menu'),
                           ),
-                        FilledButton.tonalIcon(
+                        _HeaderToolbarButton(
+                          icon: Icons.arrow_back_rounded,
+                          label: 'Back',
+                          compact: extraCompact,
                           onPressed: AppNavigationHistory.instance.canGoBack
                               ? () =>
                                     AppNavigationHistory.instance.goBack(router)
                               : null,
-                          icon: const Icon(Icons.arrow_back_rounded),
-                          label: const Text('Back'),
                         ),
-                        FilledButton.tonalIcon(
+                        _HeaderToolbarButton(
+                          icon: Icons.arrow_forward_rounded,
+                          label: 'Forward',
+                          compact: extraCompact,
                           onPressed: AppNavigationHistory.instance.canGoForward
                               ? () => AppNavigationHistory.instance.goForward(
                                   router,
                                 )
                               : null,
-                          icon: const Icon(Icons.arrow_forward_rounded),
-                          label: const Text('Forward'),
                         ),
                       ],
                     );
@@ -434,7 +446,12 @@ class _ShellHeader extends StatelessWidget {
                   _BreadcrumbTrail(breadcrumbs: breadcrumbs),
                 ],
                 const SizedBox(height: 16),
-                _HeaderCopy(eyebrow: eyebrow, title: title, subtitle: subtitle),
+                _HeaderCopy(
+                  eyebrow: eyebrow,
+                  title: title,
+                  subtitle: subtitle,
+                  compact: extraCompact,
+                ),
                 const SizedBox(height: 16),
                 _SearchBar(controller: searchController, onSearch: onSearch),
                 if (actions.isNotEmpty) const SizedBox(height: 16),
@@ -457,23 +474,25 @@ class _ShellHeader extends StatelessWidget {
                             spacing: 10,
                             runSpacing: 10,
                             children: <Widget>[
-                              FilledButton.tonalIcon(
+                              _HeaderToolbarButton(
+                                icon: Icons.arrow_back_rounded,
+                                label: 'Back',
+                                compact: extraCompact,
                                 onPressed:
                                     AppNavigationHistory.instance.canGoBack
                                     ? () => AppNavigationHistory.instance
                                           .goBack(router)
                                     : null,
-                                icon: const Icon(Icons.arrow_back_rounded),
-                                label: const Text('Back'),
                               ),
-                              FilledButton.tonalIcon(
+                              _HeaderToolbarButton(
+                                icon: Icons.arrow_forward_rounded,
+                                label: 'Forward',
+                                compact: extraCompact,
                                 onPressed:
                                     AppNavigationHistory.instance.canGoForward
                                     ? () => AppNavigationHistory.instance
                                           .goForward(router)
                                     : null,
-                                icon: const Icon(Icons.arrow_forward_rounded),
-                                label: const Text('Forward'),
                               ),
                             ],
                           );
@@ -488,6 +507,7 @@ class _ShellHeader extends StatelessWidget {
                         eyebrow: eyebrow,
                         title: title,
                         subtitle: subtitle,
+                        compact: extraCompact,
                       ),
                     ],
                   ),
@@ -515,11 +535,13 @@ class _HeaderCopy extends StatelessWidget {
     required this.eyebrow,
     required this.title,
     required this.subtitle,
+    this.compact = false,
   });
 
   final String eyebrow;
   final String title;
   final String subtitle;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -530,19 +552,59 @@ class _HeaderCopy extends StatelessWidget {
           eyebrow.toUpperCase(),
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
             color: const Color(0xFF155EEF),
-            letterSpacing: 1.2,
+            letterSpacing: compact ? 0.8 : 1.2,
           ),
         ),
         const SizedBox(height: 10),
-        Text(title, style: Theme.of(context).textTheme.headlineSmall),
+        Text(
+          title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: compact
+              ? Theme.of(context).textTheme.titleLarge
+              : Theme.of(context).textTheme.headlineSmall,
+        ),
         const SizedBox(height: 6),
         Text(
           subtitle,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF475569)),
+          maxLines: compact ? 3 : 4,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: const Color(0xFF475569),
+            height: compact ? 1.35 : 1.45,
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _HeaderToolbarButton extends StatelessWidget {
+  const _HeaderToolbarButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    required this.compact,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (compact) {
+      return Tooltip(
+        message: label,
+        child: IconButton.filledTonal(onPressed: onPressed, icon: Icon(icon)),
+      );
+    }
+
+    return FilledButton.tonalIcon(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      label: Text(label),
     );
   }
 }

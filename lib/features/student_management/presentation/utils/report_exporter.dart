@@ -56,12 +56,14 @@ class ReportExportSection {
     required this.headers,
     required this.rows,
     this.note,
+    this.pdfColumnFlexes,
   });
 
   final String title;
   final List<String> headers;
   final List<List<Object?>> rows;
   final String? note;
+  final List<double>? pdfColumnFlexes;
 }
 
 class ReportExportData {
@@ -75,6 +77,7 @@ class ReportExportData {
     this.reportType,
     this.examWindowLabel,
     this.generatedAt,
+    this.pdfLandscape = false,
   });
 
   final String title;
@@ -86,6 +89,7 @@ class ReportExportData {
   final String? reportType;
   final String? examWindowLabel;
   final DateTime? generatedAt;
+  final bool pdfLandscape;
 }
 
 class ReportExporter {
@@ -224,9 +228,16 @@ class ReportExporter {
     required ReportExportData report,
   }) async {
     final pw.Document document = pw.Document();
+    final bool useLandscape =
+        report.pdfLandscape ||
+        report.sections.any(
+          (ReportExportSection section) => section.headers.length >= 9,
+        );
     document.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
+        pageFormat: useLandscape
+            ? PdfPageFormat.a4.landscape
+            : PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(28),
         build: (pw.Context context) {
           return <pw.Widget>[
@@ -276,40 +287,10 @@ class ReportExporter {
             ],
             for (final ReportExportSection section
                 in report.sections) ...<pw.Widget>[
-              pw.SizedBox(height: 22),
-              pw.Text(
-                section.title,
-                style: pw.TextStyle(
-                  fontSize: 15,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              if ((section.note ?? '').isNotEmpty) ...<pw.Widget>[
-                pw.SizedBox(height: 4),
-                pw.Text(section.note!, style: const pw.TextStyle(fontSize: 10)),
-              ],
-              pw.SizedBox(height: 10),
-              pw.TableHelper.fromTextArray(
-                headers: section.headers,
-                data: section.rows.map<List<String>>((List<Object?> row) {
-                  return row.map<String>(_stringify).toList();
-                }).toList(),
-                headerStyle: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.white,
-                ),
-                headerDecoration: const pw.BoxDecoration(
-                  color: PdfColors.blue700,
-                ),
-                cellStyle: const pw.TextStyle(fontSize: 9),
-                cellAlignment: pw.Alignment.centerLeft,
-                cellPadding: const pw.EdgeInsets.all(6),
-                headerPadding: const pw.EdgeInsets.all(7),
-                border: pw.TableBorder.all(color: PdfColors.grey400),
-              ),
+              ..._buildPdfSection(section: section, useLandscape: useLandscape),
             ],
             if ((report.footnote ?? '').isNotEmpty) ...<pw.Widget>[
-              pw.SizedBox(height: 18),
+              pw.SizedBox(height: 22),
               pw.Text(
                 report.footnote!,
                 style: const pw.TextStyle(fontSize: 10),
@@ -326,6 +307,56 @@ class ReportExporter {
       bytes: bytes,
       format: ReportFileFormat.pdf,
     );
+  }
+
+  static List<pw.Widget> _buildPdfSection({
+    required ReportExportSection section,
+    required bool useLandscape,
+  }) {
+    final bool denseTable = useLandscape || section.headers.length >= 9;
+    final double cellFontSize = denseTable ? 7.4 : 9;
+    final double headerFontSize = denseTable ? 8 : 9.5;
+
+    return <pw.Widget>[
+      pw.SizedBox(height: 22),
+      pw.Text(
+        section.title,
+        style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
+      ),
+      if ((section.note ?? '').isNotEmpty) ...<pw.Widget>[
+        pw.SizedBox(height: 4),
+        pw.Text(section.note!, style: const pw.TextStyle(fontSize: 10)),
+      ],
+      pw.SizedBox(height: 10),
+      pw.TableHelper.fromTextArray(
+        headers: section.headers,
+        data: section.rows.map<List<String>>((List<Object?> row) {
+          return row.map<String>(_stringify).toList();
+        }).toList(),
+        columnWidths: _buildPdfColumnWidths(section),
+        cellAlignments: _buildPdfCellAlignments(section.headers),
+        headerAlignments: _buildPdfCellAlignments(section.headers),
+        headerStyle: pw.TextStyle(
+          fontSize: headerFontSize,
+          fontWeight: pw.FontWeight.bold,
+          color: PdfColors.white,
+        ),
+        headerDecoration: const pw.BoxDecoration(color: PdfColors.blue700),
+        rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+        oddRowDecoration: const pw.BoxDecoration(color: PdfColors.blue50),
+        cellStyle: pw.TextStyle(fontSize: cellFontSize),
+        cellAlignment: pw.Alignment.centerLeft,
+        cellPadding: pw.EdgeInsets.symmetric(
+          horizontal: denseTable ? 4 : 6,
+          vertical: denseTable ? 5 : 6,
+        ),
+        headerPadding: pw.EdgeInsets.symmetric(
+          horizontal: denseTable ? 4 : 7,
+          vertical: denseTable ? 6 : 7,
+        ),
+        border: pw.TableBorder.all(color: PdfColors.grey400),
+      ),
+    ];
   }
 
   static Future<String?> _saveBytes({
@@ -454,5 +485,103 @@ class ReportExporter {
     final String hour = value.hour.toString().padLeft(2, '0');
     final String minute = value.minute.toString().padLeft(2, '0');
     return '${value.year}-$month-$day $hour:$minute';
+  }
+
+  static Map<int, pw.TableColumnWidth>? _buildPdfColumnWidths(
+    ReportExportSection section,
+  ) {
+    final List<String> headers = section.headers;
+    if (headers.isEmpty) {
+      return null;
+    }
+
+    if (section.pdfColumnFlexes != null &&
+        section.pdfColumnFlexes!.length == headers.length) {
+      return <int, pw.TableColumnWidth>{
+        for (int index = 0; index < headers.length; index += 1)
+          index: pw.FlexColumnWidth(section.pdfColumnFlexes![index]),
+      };
+    }
+
+    return <int, pw.TableColumnWidth>{
+      for (int index = 0; index < headers.length; index += 1)
+        index: pw.FlexColumnWidth(_inferPdfColumnFlex(headers[index])),
+    };
+  }
+
+  static Map<int, pw.Alignment> _buildPdfCellAlignments(List<String> headers) {
+    return <int, pw.Alignment>{
+      for (int index = 0; index < headers.length; index += 1)
+        index: _inferPdfAlignment(headers[index]),
+    };
+  }
+
+  static double _inferPdfColumnFlex(String header) {
+    final String normalized = header.toLowerCase();
+
+    if (normalized.contains('student')) {
+      return 2.3;
+    }
+    if (normalized.contains('subject')) {
+      return 1.8;
+    }
+    if (normalized.contains('uploaded on')) {
+      return 1.6;
+    }
+    if (normalized.contains('uploaded by')) {
+      return 1.35;
+    }
+    if (normalized.contains('exam label')) {
+      return 1.45;
+    }
+    if (normalized.contains('exam date')) {
+      return 1.1;
+    }
+    if (normalized.contains('exam type')) {
+      return 1.15;
+    }
+    if (normalized.contains('admission')) {
+      return 1.25;
+    }
+    if (normalized == 'class') {
+      return 1.0;
+    }
+    if (normalized.contains('division')) {
+      return 1.15;
+    }
+    if (normalized.contains('attendance')) {
+      return 1.1;
+    }
+    if (normalized.contains('average')) {
+      return 1.0;
+    }
+    if (normalized.contains('score') ||
+        normalized.contains('grade') ||
+        normalized.contains('points')) {
+      return 0.85;
+    }
+    return 1.0;
+  }
+
+  static pw.Alignment _inferPdfAlignment(String header) {
+    final String normalized = header.toLowerCase();
+
+    if (normalized.contains('score') ||
+        normalized.contains('average') ||
+        normalized.contains('attendance') ||
+        normalized.contains('points') ||
+        normalized.contains('conducted')) {
+      return pw.Alignment.centerRight;
+    }
+
+    if (normalized.contains('date') ||
+        normalized.contains('type') ||
+        normalized == 'class' ||
+        normalized.contains('division') ||
+        normalized.contains('grade')) {
+      return pw.Alignment.center;
+    }
+
+    return pw.Alignment.centerLeft;
   }
 }

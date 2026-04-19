@@ -1,0 +1,2 @@
+"""Student system FastAPI backend."""
+

@@ -103,21 +103,20 @@ class _HierarchyExplorerScreenState
             _selectedDistrictId,
             (District item) => item.id,
           );
-          final List<School> schools = schoolsAsync.valueOrNull ?? <School>[];
+          final List<School> schools = schoolsAsync.value ?? <School>[];
           final School? selectedSchool = _findById<School>(
             schools,
             _selectedSchoolId,
             (School item) => item.id,
           );
           final List<SchoolClass> classes =
-              classesAsync.valueOrNull ?? <SchoolClass>[];
+              classesAsync.value ?? <SchoolClass>[];
           final SchoolClass? selectedClass = _findById<SchoolClass>(
             classes,
             _selectedClassId,
             (SchoolClass item) => item.id,
           );
-          final List<Student> students =
-              studentsAsync.valueOrNull ?? <Student>[];
+          final List<Student> students = studentsAsync.value ?? <Student>[];
           final Student? selectedStudent = _findById<Student>(
             students,
             _selectedStudentId,
@@ -125,6 +124,7 @@ class _HierarchyExplorerScreenState
           );
 
           return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: <Widget>[
               RevealMotion(
@@ -399,46 +399,54 @@ class _ExplorerHero extends StatelessWidget {
       if (student != null) _Crumb(label: student!.fullName, onTap: onReset),
     ];
 
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(34),
-        gradient: const LinearGradient(
-          colors: <Color>[
-            Color(0xFF081423),
-            Color(0xFF163255),
-            Color(0xFF0F766E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const _Badge(
-            label: 'Hierarchy drill-down',
-            tone: Colors.white24,
-            textColor: Colors.white,
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Drill down, roll up, and keep context visible.',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Every selection layer now shares the same reporting visual system used across dashboard, analytics, and results.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.white.withValues(alpha: 0.84),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool compact = constraints.maxWidth < 560;
+        return Container(
+          padding: EdgeInsets.all(compact ? 20 : 28),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(compact ? 28 : 34),
+            gradient: const LinearGradient(
+              colors: <Color>[
+                Color(0xFF081423),
+                Color(0xFF163255),
+                Color(0xFF0F766E),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
-          const SizedBox(height: 18),
-          Wrap(spacing: 10, runSpacing: 10, children: crumbs),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const _Badge(
+                label: 'Hierarchy drill-down',
+                tone: Colors.white24,
+                textColor: Colors.white,
+              ),
+              SizedBox(height: compact ? 14 : 18),
+              Text(
+                'Drill down, roll up, and keep context visible.',
+                style:
+                    (compact
+                            ? Theme.of(context).textTheme.headlineSmall
+                            : Theme.of(context).textTheme.headlineMedium)
+                        ?.copyWith(color: Colors.white),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Every selection layer now shares the same reporting visual system used across dashboard, analytics, and results.',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.84),
+                  height: compact ? 1.35 : 1.45,
+                ),
+              ),
+              SizedBox(height: compact ? 14 : 18),
+              Wrap(spacing: 10, runSpacing: 10, children: crumbs),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -453,129 +461,140 @@ class _ScopeBoard extends StatelessWidget {
     return HoverLift(
       borderRadius: BorderRadius.circular(30),
       shadowColor: const Color(0xFF155EEF),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: <Color>[Color(0xFFF9FBFF), Colors.white],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: const Color(0xFFDCE7FA)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(scope.title, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 6),
-              Text(
-                scope.subtitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF475569),
-                ),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final bool compact = constraints.maxWidth < 560;
+          return Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: <Color>[Color(0xFFF9FBFF), Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(height: 18),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: const Color(0xFFDCE7FA)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 18 : 22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  _MiniStat(
-                    label: 'Learners',
-                    value: '${scope.totalStudents}',
-                    tone: const Color(0xFFEAF1FF),
+                  Text(
+                    scope.title,
+                    style: compact
+                        ? Theme.of(context).textTheme.titleMedium
+                        : Theme.of(context).textTheme.titleLarge,
                   ),
-                  _MiniStat(
-                    label: 'Attendance',
-                    value: '${scope.averageAttendance}%',
-                    tone: const Color(0xFFE8F7EE),
+                  const SizedBox(height: 6),
+                  Text(
+                    scope.subtitle,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF475569),
+                    ),
                   ),
-                  _MiniStat(
-                    label: 'Score',
-                    value: '${scope.averageScore}%',
-                    tone: const Color(0xFFF4EBFF),
+                  const SizedBox(height: 18),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: <Widget>[
+                      _MiniStat(
+                        label: 'Learners',
+                        value: '${scope.totalStudents}',
+                        tone: const Color(0xFFEAF1FF),
+                      ),
+                      _MiniStat(
+                        label: 'Attendance',
+                        value: '${scope.averageAttendance}%',
+                        tone: const Color(0xFFE8F7EE),
+                      ),
+                      _MiniStat(
+                        label: 'Score',
+                        value: '${scope.averageScore}%',
+                        tone: const Color(0xFFF4EBFF),
+                      ),
+                      _MiniStat(
+                        label: 'At risk',
+                        value: '${scope.atRiskStudents}',
+                        tone: const Color(0xFFFFF4E8),
+                      ),
+                    ],
                   ),
-                  _MiniStat(
-                    label: 'At risk',
-                    value: '${scope.atRiskStudents}',
-                    tone: const Color(0xFFFFF4E8),
+                  const SizedBox(height: 20),
+                  LayoutBuilder(
+                    builder:
+                        (BuildContext context, BoxConstraints constraints) {
+                          final bool stacked = constraints.maxWidth < 940;
+                          final Widget trendPanel = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                'Performance trend',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: compact ? 190 : 220,
+                                child: _ScopeTrendChart(points: scope.trend),
+                              ),
+                            ],
+                          );
+                          final Widget distributionPanel = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                'Intervention mix',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              ...scope.riskDistribution.entries.map((
+                                MapEntry<String, int> entry,
+                              ) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _DistributionBar(
+                                    label: entry.key,
+                                    value: entry.value,
+                                    max: scope.totalStudents == 0
+                                        ? 1
+                                        : scope.totalStudents,
+                                    color: _distributionColor(entry.key),
+                                  ),
+                                );
+                              }),
+                              const SizedBox(height: 4),
+                              _Badge(
+                                label: 'Top performer: ${scope.topPerformer}',
+                                tone: const Color(0xFFEAF1FF),
+                                textColor: const Color(0xFF155EEF),
+                              ),
+                            ],
+                          );
+
+                          if (stacked) {
+                            return Column(
+                              children: <Widget>[
+                                trendPanel,
+                                const SizedBox(height: 18),
+                                distributionPanel,
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Expanded(child: trendPanel),
+                              const SizedBox(width: 18),
+                              Expanded(child: distributionPanel),
+                            ],
+                          );
+                        },
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints constraints) {
-                  final bool stacked = constraints.maxWidth < 940;
-                  final Widget trendPanel = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'Performance trend',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        height: 220,
-                        child: _ScopeTrendChart(points: scope.trend),
-                      ),
-                    ],
-                  );
-                  final Widget distributionPanel = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'Intervention mix',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      ...scope.riskDistribution.entries.map((
-                        MapEntry<String, int> entry,
-                      ) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _DistributionBar(
-                            label: entry.key,
-                            value: entry.value,
-                            max: scope.totalStudents == 0
-                                ? 1
-                                : scope.totalStudents,
-                            color: _distributionColor(entry.key),
-                          ),
-                        );
-                      }),
-                      const SizedBox(height: 4),
-                      _Badge(
-                        label: 'Top performer: ${scope.topPerformer}',
-                        tone: const Color(0xFFEAF1FF),
-                        textColor: const Color(0xFF155EEF),
-                      ),
-                    ],
-                  );
-
-                  if (stacked) {
-                    return Column(
-                      children: <Widget>[
-                        trendPanel,
-                        const SizedBox(height: 18),
-                        distributionPanel,
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Expanded(child: trendPanel),
-                      const SizedBox(width: 18),
-                      Expanded(child: distributionPanel),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -621,62 +640,78 @@ class _ExplorerSection<T> extends StatelessWidget {
     return HoverLift(
       borderRadius: BorderRadius.circular(30),
       shadowColor: tone,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: <Color>[tone.withValues(alpha: 0.06), Colors.white],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: tone.withValues(alpha: 0.14)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(title, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 6),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF475569),
-                ),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final bool compact = constraints.maxWidth < 560;
+          final double tileWidth = constraints.maxWidth < 720
+              ? constraints.maxWidth
+              : 300;
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: <Color>[tone.withValues(alpha: 0.06), Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(height: 18),
-              if (loading)
-                const Center(child: CircularProgressIndicator())
-              else if (items.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: tone.withValues(alpha: 0.14)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 18 : 22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    title,
+                    style: compact
+                        ? Theme.of(context).textTheme.titleMedium
+                        : Theme.of(context).textTheme.titleLarge,
                   ),
-                  child: Text(emptyMessage),
-                )
-              else
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: items.map((T item) {
-                    final String id = _extractId(item);
-                    return HoverLift(
-                      borderRadius: BorderRadius.circular(22),
-                      shadowColor: tone,
-                      child: InkWell(
-                        onTap: () => onTap(item),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  if (loading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (items.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(22),
-                        child: itemBuilder(item, id == selectedId),
                       ),
-                    );
-                  }).toList(),
-                ),
-            ],
-          ),
-        ),
+                      child: Text(emptyMessage),
+                    )
+                  else
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: items.map((T item) {
+                        final String id = _extractId(item);
+                        return SizedBox(
+                          width: tileWidth,
+                          child: HoverLift(
+                            borderRadius: BorderRadius.circular(22),
+                            shadowColor: tone,
+                            child: InkWell(
+                              onTap: () => onTap(item),
+                              borderRadius: BorderRadius.circular(22),
+                              child: itemBuilder(item, id == selectedId),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -708,62 +743,80 @@ class _EntityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      width: 300,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: selected ? tone.withValues(alpha: 0.08) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: selected ? tone : const Color(0xFFE2E8F0)),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: tone.withValues(alpha: selected ? 0.12 : 0.04),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: tone.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: tone),
-              ),
-              const Spacer(),
-              _Badge(
-                label: badgeLabel,
-                tone: tone.withValues(alpha: 0.1),
-                textColor: tone,
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool compact = constraints.maxWidth < 260;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: EdgeInsets.all(compact ? 16 : 18),
+          decoration: BoxDecoration(
+            color: selected ? tone.withValues(alpha: 0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: selected ? tone : const Color(0xFFE2E8F0),
+            ),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: tone.withValues(alpha: selected ? 0.12 : 0.04),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF475569)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: <Widget>[
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: tone.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(icon, color: tone),
+                  ),
+                  _Badge(
+                    label: badgeLabel,
+                    tone: tone.withValues(alpha: 0.1),
+                    textColor: tone,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                maxLines: compact ? 3 : 4,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF475569),
+                ),
+              ),
+              const SizedBox(height: 14),
+              ...stats.map((String stat) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    stat,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                );
+              }),
+            ],
           ),
-          const SizedBox(height: 14),
-          ...stats.map((String stat) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(stat, style: Theme.of(context).textTheme.bodySmall),
-            );
-          }),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -801,25 +854,28 @@ class _MiniStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 170,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tone,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: const Color(0xFF475569)),
-          ),
-          const SizedBox(height: 8),
-          Text(value, style: Theme.of(context).textTheme.headlineSmall),
-        ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 140, maxWidth: 170),
+      child: Container(
+        width: 170,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: tone,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: const Color(0xFF475569)),
+            ),
+            const SizedBox(height: 8),
+            Text(value, style: Theme.of(context).textTheme.headlineSmall),
+          ],
+        ),
       ),
     );
   }

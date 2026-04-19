@@ -59,6 +59,8 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double screenWidth = MediaQuery.sizeOf(context).width;
+    final bool compactExportAction = screenWidth < 720;
     final SchoolAdminState adminState = ref.watch(schoolAdminProvider);
     final SchoolOverview overview = ref.watch(schoolOverviewProvider);
     final SessionUser? session = adminState.session;
@@ -146,7 +148,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
               ? null
               : () => _showExportOptions(context, overview, _selectedClass!),
           icon: const Icon(Icons.download_rounded),
-          label: const Text('Download Reports'),
+          label: Text(compactExportAction ? 'Export' : 'Download Reports'),
         ),
       ],
       child: ListView(
@@ -198,6 +200,13 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
               ],
             ),
             const SizedBox(height: 18),
+            _ResultsExportBanner(
+              className: _selectedClass!,
+              compact: screenWidth < 640,
+              onPressed: () =>
+                  _showExportOptions(context, overview, _selectedClass!),
+            ),
+            const SizedBox(height: 18),
             LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 final bool stacked = constraints.maxWidth < 1220;
@@ -229,7 +238,11 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                               _selectedClass!,
                             ),
                             icon: const Icon(Icons.download_rounded),
-                            label: const Text('Export'),
+                            label: Text(
+                              constraints.maxWidth < 720
+                                  ? 'Reports'
+                                  : 'Export Reports',
+                            ),
                           ),
                         ],
                       ),
@@ -413,12 +426,23 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: const BoxConstraints(maxWidth: 720),
       builder: (BuildContext sheetContext) {
-        return SafeArea(
-          child: StatefulBuilder(
-            builder: (BuildContext context, void Function(void Function()) setState) {
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        return StatefulBuilder(
+          builder: (BuildContext context, void Function(void Function()) setState) {
+            return ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+              ),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  8,
+                  20,
+                  20 + MediaQuery.viewInsetsOf(context).bottom,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,9 +453,37 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Download school-wide result boards or exam-level sheets as Excel or PDF, filtered by exam type when needed.',
+                      'Download clean result boards or exam-level ledgers for $className as Excel or PDF, filtered by exam type when needed.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          const Icon(
+                            Icons.class_rounded,
+                            size: 18,
+                            color: Color(0xFF155EEF),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Working class: $className',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -459,7 +511,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                     _ExportOptionCard(
                       title: 'General School Result',
                       description:
-                          'Whole-school learner result table with division, attendance, and average score.',
+                          'Class learner result table with division, attendance, and average score in a cleaner board format.',
                       onExcel: () {
                         Navigator.of(sheetContext).pop();
                         _exportGeneralResults(
@@ -485,7 +537,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                     _ExportOptionCard(
                       title: 'Exam Ledger',
                       description:
-                          'Labeled exam-by-exam subject report with exam type, exam name, score, grade, and points.',
+                          'Subject-by-subject exam ledger with improved PDF spacing for exam type, label, dates, score, grade, and points.',
                       onExcel: () {
                         Navigator.of(sheetContext).pop();
                         _exportExamLedger(
@@ -509,9 +561,9 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                     ),
                   ],
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -717,10 +769,26 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
               'Rows are grouped by learner and subject so teachers and leadership can audit each exam conducted.',
           headers: headers,
           rows: rows,
+          pdfColumnFlexes: const <double>[
+            2.4,
+            1.25,
+            1.0,
+            1.85,
+            1.15,
+            1.45,
+            1.1,
+            1.5,
+            1.25,
+            0.8,
+            1.0,
+            0.8,
+            0.8,
+          ],
         ),
       ],
       footnote:
           'Generated from the live board. Export formats available: Excel and PDF.',
+      pdfLandscape: true,
     );
 
     final String? path = await ReportExporter.exportReport(
@@ -903,44 +971,148 @@ class _ExportOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text(
-            description,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF475569)),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool stackedButtons = constraints.maxWidth < 360;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              FilledButton.tonalIcon(
-                onPressed: onExcel,
-                icon: const Icon(Icons.table_chart_rounded),
-                label: const Text('Excel'),
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF475569),
+                ),
               ),
-              FilledButton.tonalIcon(
-                onPressed: onPdf,
-                icon: const Icon(Icons.picture_as_pdf_rounded),
-                label: const Text('PDF'),
-              ),
+              const SizedBox(height: 14),
+              if (stackedButtons) ...<Widget>[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: onExcel,
+                    icon: const Icon(Icons.table_chart_rounded),
+                    label: const Text('Export Excel'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: onPdf,
+                    icon: const Icon(Icons.picture_as_pdf_rounded),
+                    label: const Text('Export PDF'),
+                  ),
+                ),
+              ] else
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: <Widget>[
+                    FilledButton.tonalIcon(
+                      onPressed: onExcel,
+                      icon: const Icon(Icons.table_chart_rounded),
+                      label: const Text('Excel'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: onPdf,
+                      icon: const Icon(Icons.picture_as_pdf_rounded),
+                      label: const Text('PDF'),
+                    ),
+                  ],
+                ),
             ],
           ),
-        ],
+        );
+      },
+    );
+  }
+}
+
+class _ResultsExportBanner extends StatelessWidget {
+  const _ResultsExportBanner({
+    required this.className,
+    required this.compact,
+    required this.onPressed,
+  });
+
+  final String className;
+  final bool compact;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
+      child: compact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Export $className reports',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Open export options for Excel and PDF files with exam filtering.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF475569),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: onPressed,
+                    icon: const Icon(Icons.download_rounded),
+                    label: const Text('Open Export Options'),
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Export $className reports',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Open cleaner Excel and PDF exports for this class, including filtered exam ledgers.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF475569),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: onPressed,
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Open Export Options'),
+                ),
+              ],
+            ),
     );
   }
 }
