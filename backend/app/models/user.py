@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, Integer, String
+from sqlalchemy import JSON, Boolean, DateTime, Enum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -37,6 +37,23 @@ class User(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    last_password_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    two_factor_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    two_factor_secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    two_factor_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    backup_code_hashes: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     audit_logs = relationship("AuditLog", back_populates="actor")
-
+    sessions = relationship("UserSession", back_populates="user")
+    refresh_tokens = relationship("RefreshToken", back_populates="user")
+    security_tokens = relationship("SecurityToken", back_populates="user")

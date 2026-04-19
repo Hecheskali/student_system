@@ -9,9 +9,12 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
+from app.api.routes.reports import router as reports_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import close_db, init_db
+from app.middleware.input_validation import InputSanitizationMiddleware, RequestSignatureMiddleware
+from app.middleware.observability import ObservabilityMiddleware
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.services.bootstrap import bootstrap_admin
@@ -39,10 +42,14 @@ app = FastAPI(
 )
 
 app.add_middleware(RequestContextMiddleware)
+if settings.observability_enabled:
+    app.add_middleware(ObservabilityMiddleware)
 app.add_middleware(
     SecurityHeadersMiddleware,
     enable_hsts=settings.enable_hsts,
 )
+app.add_middleware(InputSanitizationMiddleware)
+app.add_middleware(RequestSignatureMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
     CORSMiddleware,
@@ -63,4 +70,4 @@ if settings.enable_https_redirect:
 app.include_router(health_router)
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
-
+app.include_router(reports_router, prefix="/api/v1")

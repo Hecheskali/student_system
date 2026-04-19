@@ -6,6 +6,32 @@ import 'package:file_selector/file_selector.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+// Professional color scheme for reports
+class ReportColors {
+  static const PdfColor primary = PdfColor(
+    0.08,
+    0.30,
+    0.70,
+  ); // Professional blue
+  static const PdfColor primaryDark = PdfColor(0.05, 0.20, 0.50); // Dark blue
+  static const PdfColor accent = PdfColor(
+    0.90,
+    0.35,
+    0.15,
+  ); // Professional orange
+  static const PdfColor lightBg = PdfColor(0.96, 0.97, 0.99); // Light blue-gray
+  static const PdfColor mediumBg = PdfColor(
+    0.92,
+    0.94,
+    0.97,
+  ); // Medium blue-gray
+  static const PdfColor textDark = PdfColor(0.15, 0.20, 0.30); // Dark text
+  static const PdfColor textLight = PdfColor(0.45, 0.50, 0.60); // Light text
+  static const PdfColor border = PdfColor(0.80, 0.83, 0.88); // Border color
+  static const PdfColor success = PdfColor(0.20, 0.65, 0.50); // Success green
+  static const PdfColor warning = PdfColor(0.95, 0.60, 0.10); // Warning orange
+}
+
 enum ReportFileFormat { excel, pdf, csv }
 
 extension ReportFileFormatX on ReportFileFormat {
@@ -233,71 +259,20 @@ class ReportExporter {
         report.sections.any(
           (ReportExportSection section) => section.headers.length >= 9,
         );
+
     document.addPage(
       pw.MultiPage(
         pageFormat: useLandscape
             ? PdfPageFormat.a4.landscape
             : PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        build: (pw.Context context) {
-          return <pw.Widget>[
-            pw.Text(
-              report.title,
-              style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
-            ),
-            if ((report.schoolName ?? '').isNotEmpty) ...<pw.Widget>[
-              pw.SizedBox(height: 4),
-              pw.Text('School: ${report.schoolName!}'),
-            ],
-            if ((report.reportType ?? '').isNotEmpty) ...<pw.Widget>[
-              pw.SizedBox(height: 2),
-              pw.Text('Report type: ${report.reportType!}'),
-            ],
-            if ((report.examWindowLabel ?? '').isNotEmpty) ...<pw.Widget>[
-              pw.SizedBox(height: 2),
-              pw.Text('Exam dates: ${report.examWindowLabel!}'),
-            ],
-            if (report.generatedAt != null) ...<pw.Widget>[
-              pw.SizedBox(height: 2),
-              pw.Text('Generated on: ${_formatDateTime(report.generatedAt)}'),
-            ],
-            if ((report.subtitle ?? '').isNotEmpty) ...<pw.Widget>[
-              pw.SizedBox(height: 6),
-              pw.Text(report.subtitle!),
-            ],
-            if (report.summary.isNotEmpty) ...<pw.Widget>[
-              pw.SizedBox(height: 16),
-              pw.Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: report.summary.map((ReportSummaryItem item) {
-                  return pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: pw.BoxDecoration(
-                      color: PdfColors.blue50,
-                      borderRadius: pw.BorderRadius.circular(8),
-                    ),
-                    child: pw.Text('${item.label}: ${item.value}'),
-                  );
-                }).toList(),
-              ),
-            ],
-            for (final ReportExportSection section
-                in report.sections) ...<pw.Widget>[
-              ..._buildPdfSection(section: section, useLandscape: useLandscape),
-            ],
-            if ((report.footnote ?? '').isNotEmpty) ...<pw.Widget>[
-              pw.SizedBox(height: 22),
-              pw.Text(
-                report.footnote!,
-                style: const pw.TextStyle(fontSize: 10),
-              ),
-            ],
-          ];
-        },
+        margin: pw.EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        build: (pw.Context context) => _buildProfessionalReport(
+          report: report,
+          useLandscape: useLandscape,
+          context: context,
+        ),
+        footer: (pw.Context context) =>
+            _buildProfessionalFooter(report, context),
       ),
     );
 
@@ -309,25 +284,235 @@ class ReportExporter {
     );
   }
 
-  static List<pw.Widget> _buildPdfSection({
+  static List<pw.Widget> _buildProfessionalReport({
+    required ReportExportData report,
+    required bool useLandscape,
+    required pw.Context context,
+  }) {
+    return <pw.Widget>[
+      _buildProfessionalHeader(report),
+      pw.SizedBox(height: 18),
+      _buildMetadataSection(report),
+      pw.SizedBox(height: 20),
+      if (report.summary.isNotEmpty) ...<pw.Widget>[
+        _buildSummaryBoxes(report),
+        pw.SizedBox(height: 20),
+      ],
+      for (
+        int index = 0;
+        index < report.sections.length;
+        index += 1
+      ) ...<pw.Widget>[
+        ..._buildProfessionalSection(
+          section: report.sections[index],
+          useLandscape: useLandscape,
+        ),
+        if (index < report.sections.length - 1) pw.SizedBox(height: 16),
+      ],
+    ];
+  }
+
+  static pw.Widget _buildProfessionalHeader(ReportExportData report) {
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border(
+          bottom: pw.BorderSide(color: ReportColors.primary, width: 3),
+        ),
+      ),
+      padding: const pw.EdgeInsets.only(bottom: 12),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: <pw.Widget>[
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: <pw.Widget>[
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: <pw.Widget>[
+                    pw.Text(
+                      report.title.toUpperCase(),
+                      style: pw.TextStyle(
+                        fontSize: 20,
+                        fontWeight: pw.FontWeight.bold,
+                        color: ReportColors.primaryDark,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    if ((report.schoolName ?? '').isNotEmpty)
+                      pw.SizedBox(height: 4),
+                    if ((report.schoolName ?? '').isNotEmpty)
+                      pw.Text(
+                        report.schoolName!,
+                        style: pw.TextStyle(
+                          fontSize: 11,
+                          color: ReportColors.textLight,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (report.generatedAt != null)
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: <pw.Widget>[
+                    pw.Text(
+                      _formatDate(report.generatedAt),
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        color: ReportColors.textLight,
+                      ),
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      'ID: ${_generateReportId(report.generatedAt)}',
+                      style: pw.TextStyle(
+                        fontSize: 9,
+                        color: ReportColors.border,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          if ((report.subtitle ?? '').isNotEmpty) ...<pw.Widget>[
+            pw.SizedBox(height: 8),
+            pw.Text(
+              report.subtitle!,
+              style: pw.TextStyle(
+                fontSize: 10,
+                color: ReportColors.textLight,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildMetadataSection(ReportExportData report) {
+    final List<pw.Widget> metadata = <pw.Widget>[];
+
+    if ((report.reportType ?? '').isNotEmpty) {
+      metadata.add(_buildMetadataItem('Report Type', report.reportType!));
+    }
+    if ((report.examWindowLabel ?? '').isNotEmpty) {
+      metadata.add(_buildMetadataItem('Exam Period', report.examWindowLabel!));
+    }
+
+    if (metadata.isEmpty) {
+      return pw.SizedBox.shrink();
+    }
+
+    return pw.Wrap(spacing: 24, runSpacing: 8, children: metadata);
+  }
+
+  static pw.Widget _buildMetadataItem(String label, String value) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: <pw.Widget>[
+        pw.Text(
+          label,
+          style: pw.TextStyle(
+            fontSize: 8,
+            color: ReportColors.textLight,
+            letterSpacing: 0.3,
+          ),
+        ),
+        pw.SizedBox(height: 2),
+        pw.Text(
+          value,
+          style: pw.TextStyle(
+            fontSize: 10,
+            color: ReportColors.textDark,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _buildSummaryBoxes(ReportExportData report) {
+    return pw.Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: report.summary.map((ReportSummaryItem item) {
+        return pw.Container(
+          width: 140,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: pw.BoxDecoration(
+            color: ReportColors.lightBg,
+            border: pw.Border(
+              left: pw.BorderSide(color: ReportColors.primary, width: 3),
+            ),
+            borderRadius: pw.BorderRadius.circular(4),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: <pw.Widget>[
+              pw.Text(
+                item.label,
+                maxLines: 1,
+                overflow: pw.TextOverflow.clip,
+                style: pw.TextStyle(fontSize: 8, color: ReportColors.textLight),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                item.value,
+                maxLines: 2,
+                overflow: pw.TextOverflow.clip,
+                style: pw.TextStyle(
+                  fontSize: 11,
+                  color: ReportColors.primary,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  static List<pw.Widget> _buildProfessionalSection({
     required ReportExportSection section,
     required bool useLandscape,
   }) {
     final bool denseTable = useLandscape || section.headers.length >= 9;
-    final double cellFontSize = denseTable ? 7.4 : 9;
-    final double headerFontSize = denseTable ? 8 : 9.5;
+    final double cellFontSize = denseTable ? 7.8 : 9;
+    final double headerFontSize = denseTable ? 8.5 : 10;
 
     return <pw.Widget>[
-      pw.SizedBox(height: 22),
       pw.Text(
         section.title,
-        style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
+        style: pw.TextStyle(
+          fontSize: 12,
+          fontWeight: pw.FontWeight.bold,
+          color: ReportColors.primaryDark,
+          letterSpacing: 0.3,
+        ),
       ),
       if ((section.note ?? '').isNotEmpty) ...<pw.Widget>[
         pw.SizedBox(height: 4),
-        pw.Text(section.note!, style: const pw.TextStyle(fontSize: 10)),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(
+            color: ReportColors.mediumBg,
+            borderRadius: pw.BorderRadius.circular(3),
+          ),
+          child: pw.Text(
+            section.note!,
+            style: pw.TextStyle(
+              fontSize: 9,
+              color: ReportColors.textLight,
+              height: 1.3,
+            ),
+          ),
+        ),
       ],
-      pw.SizedBox(height: 10),
+      pw.SizedBox(height: 8),
       pw.TableHelper.fromTextArray(
         headers: section.headers,
         data: section.rows.map<List<String>>((List<Object?> row) {
@@ -340,23 +525,91 @@ class ReportExporter {
           fontSize: headerFontSize,
           fontWeight: pw.FontWeight.bold,
           color: PdfColors.white,
+          letterSpacing: 0.3,
         ),
-        headerDecoration: const pw.BoxDecoration(color: PdfColors.blue700),
-        rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
-        oddRowDecoration: const pw.BoxDecoration(color: PdfColors.blue50),
-        cellStyle: pw.TextStyle(fontSize: cellFontSize),
+        headerDecoration: pw.BoxDecoration(color: ReportColors.primary),
+        rowDecoration: pw.BoxDecoration(
+          border: pw.Border(
+            bottom: pw.BorderSide(color: ReportColors.border, width: 0.5),
+          ),
+        ),
+        oddRowDecoration: pw.BoxDecoration(
+          color: ReportColors.lightBg,
+          border: pw.Border(
+            bottom: pw.BorderSide(color: ReportColors.border, width: 0.5),
+          ),
+        ),
+        cellStyle: pw.TextStyle(
+          fontSize: cellFontSize,
+          color: ReportColors.textDark,
+        ),
         cellAlignment: pw.Alignment.centerLeft,
         cellPadding: pw.EdgeInsets.symmetric(
-          horizontal: denseTable ? 4 : 6,
-          vertical: denseTable ? 5 : 6,
+          horizontal: denseTable ? 5 : 7,
+          vertical: denseTable ? 6 : 8,
         ),
         headerPadding: pw.EdgeInsets.symmetric(
-          horizontal: denseTable ? 4 : 7,
-          vertical: denseTable ? 6 : 7,
+          horizontal: denseTable ? 5 : 8,
+          vertical: denseTable ? 8 : 9,
         ),
-        border: pw.TableBorder.all(color: PdfColors.grey400),
+        border: pw.TableBorder(
+          top: pw.BorderSide(color: ReportColors.primary, width: 1.5),
+          bottom: pw.BorderSide(color: ReportColors.border, width: 0.5),
+          horizontalInside: pw.BorderSide(
+            color: ReportColors.border,
+            width: 0.3,
+          ),
+          verticalInside: pw.BorderSide(color: ReportColors.border, width: 0.3),
+          left: pw.BorderSide(color: ReportColors.border, width: 0.5),
+          right: pw.BorderSide(color: ReportColors.border, width: 0.5),
+        ),
       ),
     ];
+  }
+
+  static pw.Widget _buildProfessionalFooter(
+    ReportExportData report,
+    pw.Context context,
+  ) {
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border(
+          top: pw.BorderSide(color: ReportColors.border, width: 1),
+        ),
+      ),
+      padding: const pw.EdgeInsets.only(top: 12),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: <pw.Widget>[
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: <pw.Widget>[
+                if ((report.footnote ?? '').isNotEmpty)
+                  pw.Text(
+                    report.footnote!,
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      color: ReportColors.textLight,
+                      height: 1.4,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: <pw.Widget>[
+              pw.Text(
+                'Page ${context.pageNumber} of ${context.pagesCount}',
+                style: pw.TextStyle(fontSize: 8, color: ReportColors.textLight),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   static Future<String?> _saveBytes({
@@ -485,6 +738,40 @@ class ReportExporter {
     final String hour = value.hour.toString().padLeft(2, '0');
     final String minute = value.minute.toString().padLeft(2, '0');
     return '${value.year}-$month-$day $hour:$minute';
+  }
+
+  static String _formatDate(DateTime? value) {
+    if (value == null) {
+      return '';
+    }
+    final List<String> monthNames = <String>[
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    final String month = monthNames[value.month - 1];
+    return '${value.day} $month ${value.year}';
+  }
+
+  static String _generateReportId(DateTime? value) {
+    if (value == null) {
+      return 'N/A';
+    }
+    final String year = value.year.toString().substring(2);
+    final String month = value.month.toString().padLeft(2, '0');
+    final String day = value.day.toString().padLeft(2, '0');
+    final String hour = value.hour.toString().padLeft(2, '0');
+    final String minute = value.minute.toString().padLeft(2, '0');
+    return 'RPT-$year$month$day-$hour$minute';
   }
 
   static Map<int, pw.TableColumnWidth>? _buildPdfColumnWidths(

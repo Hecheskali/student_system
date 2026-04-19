@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 
 from app.core.config import get_settings
@@ -25,7 +27,8 @@ async def bootstrap_admin() -> None:
             role=UserRole.head_of_school,
             is_active=True,
             must_change_password=True,
+            email_verified_at=datetime.now(UTC),
+            last_password_changed_at=datetime.now(UTC),
         )
         db.add(admin)
         await db.commit()
-

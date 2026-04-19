@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +9,7 @@ from app.models.user import User, UserRole
 from app.schemas.auth import AuditLogRead, CreateUserRequest, UserRead
 from app.core.security import hash_password
 from app.services.audit import write_audit_log
+from app.services.governance import anonymize_user, export_user_governance_snapshot
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -74,3 +75,33 @@ async def list_audit_logs(
     logs = (await db.scalars(select(AuditLog).order_by(desc(AuditLog.created_at)))).all()
     return [AuditLogRead.model_validate(log) for log in logs]
 
+
+@router.get("/users/{user_id}/export")
+async def export_user_data(
+    user_id: str,
+    _: User = Depends(require_roles(UserRole.head_of_school)),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, object]:
+    return await export_user_governance_snapshot(db, user_id=user_id)
+
+
+@router.delete("/users/{user_id}")
+async def delete_user_data(
+    user_id: str,
+    request: Request,
+    current_user: User = Depends(require_roles(UserRole.head_of_school)),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    deleted = await anonymize_user(db, user_id=user_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    await write_audit_log(
+        db,
+        actor_user_id=current_user.id,
+        event_type="admin.user.anonymized",
+        status="success",
+        target_resource="user",
+        detail={"user_id": user_id},
+        request=request,
+    )
+    return {"detail": "User anonymized."}
