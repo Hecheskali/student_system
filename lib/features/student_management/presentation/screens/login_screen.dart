@@ -16,6 +16,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
   bool _isSubmitting = false;
+  bool _isPasswordVisible = false;
 
   @override
   void initState() {
@@ -117,10 +118,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     const SizedBox(height: 14),
                                     TextField(
                                       controller: _passwordController,
-                                      obscureText: true,
-                                      decoration: const InputDecoration(
+                                      obscureText: !_isPasswordVisible,
+                                      decoration: InputDecoration(
                                         labelText: 'Password',
-                                        prefixIcon: Icon(Icons.lock_rounded),
+                                        prefixIcon: const Icon(
+                                          Icons.lock_rounded,
+                                        ),
+                                        suffixIcon: IconButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _isPasswordVisible =
+                                                  !_isPasswordVisible;
+                                            });
+                                          },
+                                          icon: Icon(
+                                            _isPasswordVisible
+                                                ? Icons.visibility_rounded
+                                                : Icons.visibility_off_rounded,
+                                          ),
+                                        ),
                                       ),
                                       onSubmitted: (_) => _submitLiveLogin(),
                                     ),
@@ -133,14 +149,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                           ? const SizedBox(
                                               width: 18,
                                               height: 18,
-                                              child:
-                                                  CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                  ),
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
                                             )
-                                          : const Icon(
-                                              Icons.login_rounded,
-                                            ),
+                                          : const Icon(Icons.login_rounded),
                                       label: const Text('Login'),
                                     ),
                                     const SizedBox(height: 20),
@@ -218,9 +231,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                                     const SizedBox(height: 12),
                                     OutlinedButton.icon(
-                                      onPressed: () => context.go(
-                                        '/signup?role=headmaster',
-                                      ),
+                                      onPressed: () =>
+                                          context.go('/signup?role=headmaster'),
                                       icon: const Icon(
                                         Icons.manage_accounts_rounded,
                                       ),
@@ -270,9 +282,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login failed: $error')));
     } finally {
       if (mounted) {
         setState(() {
