@@ -17,9 +17,9 @@ class RefreshTokenManager:
     @staticmethod
     def create_refresh_token(
         *,
-        subject: str,
+        subject: uuid.UUID | str,
         role: str,
-        session_id: str,
+        session_id: uuid.UUID | str,
     ) -> tuple[str, str, int]:
         """Create a refresh token (longer expiration than access token)."""
         settings = get_settings()
@@ -28,10 +28,10 @@ class RefreshTokenManager:
         jti = str(uuid.uuid4())
 
         payload: dict[str, Any] = {
-            "sub": subject,
+            "sub": str(subject),
             "role": role,
             "type": "refresh",
-            "sid": session_id,
+            "sid": str(session_id),
             "iat": int(datetime.now(UTC).timestamp()),
             "exp": int(expires_at.timestamp()),
             "jti": jti,
@@ -55,7 +55,6 @@ class RefreshTokenManager:
                 detail="Invalid token type.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
         return payload
 
 

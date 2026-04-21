@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, Integer, String
+from sqlalchemy import JSON, Boolean, DateTime, Enum, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -17,10 +17,10 @@ class UserRole(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     full_name: Mapped[str] = mapped_column(String(255))

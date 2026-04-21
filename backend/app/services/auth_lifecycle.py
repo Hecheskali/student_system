@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
@@ -63,14 +64,14 @@ async def issue_session_tokens(
     target_session.compromised_at = None
 
     access_token, expires_in = create_access_token(
-        subject=user.id,
+        subject=str(user.id),
         role=user.role.value,
-        session_id=target_session.id,
+        session_id=str(target_session.id),
     )
     refresh_token, jti, _ = refresh_token_manager.create_refresh_token(
-        subject=user.id,
+        subject=str(user.id),
         role=user.role.value,
-        session_id=target_session.id,
+        session_id=str(target_session.id),
     )
     refresh_record = RefreshToken(
         user_id=user.id,
@@ -131,7 +132,7 @@ async def revoke_session(
 async def revoke_all_user_sessions(
     db: AsyncSession,
     *,
-    user_id: str,
+    user_id: uuid.UUID,
     compromised: bool = False,
 ) -> None:
     active_sessions = (
@@ -204,7 +205,7 @@ async def consume_security_token(
     return token
 
 
-async def _prune_excess_sessions(db: AsyncSession, user_id: str) -> None:
+async def _prune_excess_sessions(db: AsyncSession, user_id: uuid.UUID) -> None:
     settings = get_settings()
     sessions = (
         await db.scalars(

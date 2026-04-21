@@ -31,15 +31,15 @@ def generate_opaque_token() -> str:
 
 def create_access_token(
     *,
-    subject: str,
+    subject: uuid.UUID | str,
     role: str,
-    session_id: str | None = None,
+    session_id: uuid.UUID | str | None = None,
 ) -> tuple[str, int]:
     settings = get_settings()
     expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
     expires_at = datetime.now(UTC) + expires_delta
     payload: dict[str, Any] = {
-        "sub": subject,
+        "sub": str(subject),
         "role": role,
         "type": "access",
         "jti": str(uuid.uuid4()),
@@ -47,7 +47,7 @@ def create_access_token(
         "exp": int(expires_at.timestamp()),
     }
     if session_id:
-        payload["sid"] = session_id
+        payload["sid"] = str(session_id)
     token = jwt.encode(
         payload,
         settings.jwt_secret_key.get_secret_value(),

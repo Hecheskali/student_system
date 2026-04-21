@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, JSON, String
+from sqlalchemy import DateTime, ForeignKey, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -10,12 +10,13 @@ from app.db.base import Base
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
-    user_id: Mapped[str] = mapped_column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         index=True,
     )
@@ -47,16 +48,18 @@ class UserSession(Base):
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
-    user_id: Mapped[str] = mapped_column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         index=True,
     )
-    session_id: Mapped[str] = mapped_column(
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("user_sessions.id", ondelete="CASCADE"),
         index=True,
     )
@@ -73,7 +76,8 @@ class RefreshToken(Base):
         nullable=True,
         index=True,
     )
-    replaced_by_token_id: Mapped[str | None] = mapped_column(
+    replaced_by_token_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("refresh_tokens.id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -85,12 +89,13 @@ class RefreshToken(Base):
 class SecurityToken(Base):
     __tablename__ = "security_tokens"
 
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
-    user_id: Mapped[str] = mapped_column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         index=True,
     )
@@ -110,10 +115,10 @@ class SecurityToken(Base):
 class OutboundMessage(Base):
     __tablename__ = "outbound_messages"
 
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
     channel: Mapped[str] = mapped_column(String(32), index=True)
     provider: Mapped[str] = mapped_column(String(64), index=True)

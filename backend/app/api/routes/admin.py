@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,7 +58,7 @@ async def create_user(
         event_type="admin.user.created",
         status="success",
         target_resource="user",
-        detail={"created_user_id": user.id, "role": user.role.value},
+        detail={"created_user_id": str(user.id), "role": user.role.value},
         request=request,
     )
     return UserRead.model_validate(user)
@@ -78,7 +80,7 @@ async def list_audit_logs(
 
 @router.get("/users/{user_id}/export")
 async def export_user_data(
-    user_id: str,
+    user_id: uuid.UUID,
     _: User = Depends(require_roles(UserRole.head_of_school)),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
@@ -87,7 +89,7 @@ async def export_user_data(
 
 @router.delete("/users/{user_id}")
 async def delete_user_data(
-    user_id: str,
+    user_id: uuid.UUID,
     request: Request,
     current_user: User = Depends(require_roles(UserRole.head_of_school)),
     db: AsyncSession = Depends(get_db),
@@ -101,7 +103,7 @@ async def delete_user_data(
         event_type="admin.user.anonymized",
         status="success",
         target_resource="user",
-        detail={"user_id": user_id},
+        detail={"user_id": str(user_id)},
         request=request,
     )
     return {"detail": "User anonymized."}

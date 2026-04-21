@@ -1,3 +1,4 @@
+import uuid
 from typing import Any
 
 from fastapi import Request
@@ -11,7 +12,7 @@ async def write_audit_log(
     *,
     event_type: str,
     status: str = "success",
-    actor_user_id: str | None = None,
+    actor_user_id: uuid.UUID | None = None,
     target_resource: str | None = None,
     detail: dict[str, Any] | None = None,
     request: Request | None = None,
@@ -28,4 +29,3 @@ async def write_audit_log(
     )
     db.add(record)
     await db.commit()
-

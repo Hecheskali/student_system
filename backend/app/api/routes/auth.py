@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -46,6 +47,16 @@ from app.core.security import verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
+
+
+def _parse_token_uuid(value: object, field_name: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid refresh token {field_name}.",
+        ) from exc
 
 
 @router.post(
@@ -195,7 +206,9 @@ async def refresh_access_token(
             detail="Invalid refresh token payload.",
         )
 
-    user = await db.scalar(select(User).where(User.id == user_id))
+    parsed_user_id = _parse_token_uuid(user_id, "subject")
+    parsed_session_id = _parse_token_uuid(session_id, "session")
+    user = await db.scalar(select(User).where(User.id == parsed_user_id))
     token_record = await db.scalar(select(RefreshToken).where(RefreshToken.jti == jti))
     if user is None or token_record is None:
         raise HTTPException(
@@ -208,13 +221,15 @@ async def refresh_access_token(
             detail="Refresh token is invalid.",
         )
     if token_record.revoked_at is not None:
-        session = await db.scalar(select(UserSession).where(UserSession.id == session_id))
+        session = await db.scalar(
+            select(UserSession).where(UserSession.id == parsed_session_id),
+        )
         if session is not None:
             await revoke_session(db, session=session, compromised=True)
-        await revoke_all_user_sessions(db, user_id=user_id, compromised=True)
+        await revoke_all_user_sessions(db, user_id=parsed_user_id, compromised=True)
         await send_alert(
             title="Refresh token reuse detected",
-            body=f"User {user_id} triggered refresh token reuse detection.",
+            body=f"User {parsed_user_id} triggered refresh token reuse detection.",
             severity="critical",
         )
         raise HTTPException(
@@ -444,7 +459,7 @@ async def disable_two_factor(
 
 @router.post("/sessions/{session_id}/revoke", response_model=SecurityActionResponse)
 async def revoke_one_session(
-    session_id: str,
+    session_id: uuid.UUID,
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -467,7 +482,7 @@ async def revoke_one_session(
         event_type="auth.session.revoked",
         status="success",
         target_resource="session",
-        detail={"session_id": session_id},
+        detail={"session_id": str(session_id)},
         request=request,
     )
     return SecurityActionResponse(detail="Session revoked.")

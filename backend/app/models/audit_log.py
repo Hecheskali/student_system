@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, JSON, String
+from sqlalchemy import ForeignKey, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -9,12 +9,13 @@ from app.db.base import Base
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    id: Mapped[str] = mapped_column(
-        String(36),
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
-    actor_user_id: Mapped[str | None] = mapped_column(
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("users.id"),
         nullable=True,
         index=True,
@@ -28,4 +29,3 @@ class AuditLog(Base):
     detail_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
     actor = relationship("User", back_populates="audit_logs")
-

@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, or_, select
@@ -57,7 +58,7 @@ async def purge_expired_security_data(db: AsyncSession) -> dict[str, int]:
 async def export_user_governance_snapshot(
     db: AsyncSession,
     *,
-    user_id: str,
+    user_id: uuid.UUID,
 ) -> dict[str, object]:
     user = await db.scalar(select(User).where(User.id == user_id))
     if user is None:
@@ -72,7 +73,7 @@ async def export_user_governance_snapshot(
 
     return {
         "user": {
-            "id": user.id,
+            "id": str(user.id),
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role.value,
@@ -83,7 +84,7 @@ async def export_user_governance_snapshot(
         },
         "sessions": [
             {
-                "id": session.id,
+                "id": str(session.id),
                 "ip_address": session.ip_address,
                 "user_agent": session.user_agent,
                 "created_at": session.created_at.isoformat(),
@@ -96,7 +97,7 @@ async def export_user_governance_snapshot(
         ],
         "audit_logs": [
             {
-                "id": log.id,
+                "id": str(log.id),
                 "event_type": log.event_type,
                 "status": log.status,
                 "created_at": log.created_at.isoformat(),
@@ -107,7 +108,7 @@ async def export_user_governance_snapshot(
     }
 
 
-async def anonymize_user(db: AsyncSession, *, user_id: str) -> bool:
+async def anonymize_user(db: AsyncSession, *, user_id: uuid.UUID) -> bool:
     user = await db.scalar(select(User).where(User.id == user_id))
     if user is None:
         return False

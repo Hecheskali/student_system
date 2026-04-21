@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -15,7 +16,7 @@ class LoginRequest(BaseModel):
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: uuid.UUID
     email: EmailStr
     full_name: str
     role: UserRole
@@ -31,7 +32,7 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
-    session_id: str
+    session_id: uuid.UUID
     user: UserRead
 
 
@@ -63,8 +64,8 @@ class CreateUserRequest(BaseModel):
 class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
-    actor_user_id: str | None
+    id: uuid.UUID
+    actor_user_id: uuid.UUID | None
     event_type: str
     status: str
     target_resource: str | None
@@ -112,7 +113,7 @@ class EmailVerificationConfirmRequest(BaseModel):
 class SessionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: uuid.UUID
     ip_address: str | None
     user_agent: str | None
     device_fingerprint: str | None

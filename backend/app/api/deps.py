@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -19,6 +20,16 @@ def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
     return decode_token(token)
 
 
+def _parse_uuid(value: Any, field_name: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid authentication {field_name}.",
+        ) from exc
+
+
 async def get_current_user(
     payload: dict[str, Any] = Depends(get_token_payload),
     db: AsyncSession = Depends(get_db),
@@ -29,7 +40,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication payload.",
         )
-    user = await db.scalar(select(User).where(User.id == user_id))
+    user = await db.scalar(select(User).where(User.id == _parse_uuid(user_id, "subject")))
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -37,8 +48,9 @@ async def get_current_user(
         )
     session_id = payload.get("sid")
     if session_id:
+        parsed_session_id = _parse_uuid(session_id, "session")
         session = await db.scalar(
-            select(UserSession).where(UserSession.id == session_id),
+            select(UserSession).where(UserSession.id == parsed_session_id),
         )
         if (
             session is None
@@ -61,7 +73,8 @@ async def get_current_session(
     session_id = payload.get("sid")
     if not session_id:
         return None
-    return await db.scalar(select(UserSession).where(UserSession.id == session_id))
+    parsed_session_id = _parse_uuid(session_id, "session")
+    return await db.scalar(select(UserSession).where(UserSession.id == parsed_session_id))
 
 
 def require_roles(*roles: UserRole) -> Callable[[User], Awaitable[User]]:
