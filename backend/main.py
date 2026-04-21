@@ -6,6 +6,4 @@ definition. Re-export the canonical FastAPI application so both
 """
 
 from app.main import app
-from fastapi import FastAPI
 
-app = FastAPI()

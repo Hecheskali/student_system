@@ -64,7 +64,6 @@ build/
 .flutter-plugins
 
 # Web build artifacts
-web/
 .dartignore
 
 # IDE files

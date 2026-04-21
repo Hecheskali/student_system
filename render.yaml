@@ -20,7 +20,9 @@ services:
       - key: AUTO_CREATE_SCHEMA
         value: "false"
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: student-system-db
+          property: connectionString
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: JWT_PREVIOUS_SECRET_KEYS
@@ -63,7 +65,9 @@ services:
       - key: AUTO_CREATE_SCHEMA
         value: "false"
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: student-system-db
+          property: connectionString
       - key: JWT_SECRET_KEY
         sync: false
       - key: AUDIT_RETENTION_DAYS
@@ -87,7 +91,9 @@ services:
       - key: AUTO_CREATE_SCHEMA
         value: "false"
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: student-system-db
+          property: connectionString
       - key: JWT_SECRET_KEY
         sync: false
       - key: EMAIL_PROVIDER

@@ -37,3 +37,7 @@ jobs:
         run: flutter pub get
       - name: Flutter analyze
         run: flutter analyze
+      - name: Flutter test
+        run: flutter test
+      - name: Flutter web build
+        run: flutter build web --release --base-href=/
