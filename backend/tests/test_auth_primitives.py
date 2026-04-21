@@ -15,6 +15,37 @@ def test_database_url_is_normalized_for_async_postgres() -> None:
     )
 
 
+def test_csv_env_lists_are_parsed_without_json(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "ALLOWED_ORIGINS",
+        "https://app.example.com, https://admin.example.com",
+    )
+    monkeypatch.setenv(
+        "TRUSTED_HOSTS",
+        "localhost,127.0.0.1,student-system.onrender.com",
+    )
+    monkeypatch.setenv(
+        "JWT_PREVIOUS_SECRET_KEYS",
+        ",".join(["a" * 64, "b" * 64]),
+    )
+
+    settings = Settings(JWT_SECRET_KEY=SecretStr("x" * 64))
+
+    assert settings.allowed_origins == [
+        "https://app.example.com",
+        "https://admin.example.com",
+    ]
+    assert settings.trusted_hosts == [
+        "localhost",
+        "127.0.0.1",
+        "student-system.onrender.com",
+    ]
+    assert [secret.get_secret_value() for secret in settings.jwt_previous_secret_keys] == [
+        "a" * 64,
+        "b" * 64,
+    ]
+
+
 def test_access_token_carries_session_id() -> None:
     token, _ = create_access_token(
         subject="user-123",

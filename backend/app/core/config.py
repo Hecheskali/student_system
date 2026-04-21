@@ -1,9 +1,9 @@
 import os
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
         default=5,
         alias="MAX_SESSIONS_PER_USER",
     )
-    jwt_previous_secret_keys: list[SecretStr] = Field(
+    jwt_previous_secret_keys: Annotated[list[SecretStr], NoDecode] = Field(
         default_factory=list,
         alias="JWT_PREVIOUS_SECRET_KEYS",
     )
@@ -78,11 +78,11 @@ class Settings(BaseSettings):
         alias="ACCOUNT_LOCKOUT_MINUTES",
     )
 
-    trusted_hosts: list[str] = Field(
+    trusted_hosts: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["localhost", "127.0.0.1"],
         alias="TRUSTED_HOSTS",
     )
-    allowed_origins: list[str] = Field(
+    allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000"],
         alias="ALLOWED_ORIGINS",
     )
