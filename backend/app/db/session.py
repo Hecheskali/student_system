@@ -8,6 +8,13 @@ from app.db.base import Base
 
 settings = get_settings()
 
+
+def _build_connect_args(database_url: str) -> dict[str, int]:
+    if database_url.startswith("postgresql+asyncpg://"):
+        return {"timeout": 10, "command_timeout": 10}
+    return {}
+
+
 engine = create_async_engine(
     settings.database_url,
     future=True,
@@ -16,7 +23,7 @@ engine = create_async_engine(
     pool_size=5,
     pool_timeout=30,
     pool_recycle=3600,
-    connect_args={"connect_timeout": 10, "command_timeout": 10},
+    connect_args=_build_connect_args(settings.database_url),
 )
 SessionLocal = async_sessionmaker(
     bind=engine,
