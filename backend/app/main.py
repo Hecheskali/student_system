@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,14 +22,24 @@ from app.services.bootstrap import bootstrap_admin
 
 settings = get_settings()
 configure_logging(settings.log_level)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await init_db()
-    await bootstrap_admin()
-    yield
-    await close_db()
+    try:
+        logger.info("application startup beginning")
+        await init_db()
+        logger.info("database initialization step completed")
+        await bootstrap_admin()
+        logger.info("bootstrap admin step completed")
+        yield
+    except Exception:
+        logger.exception("application startup failed")
+        raise
+    finally:
+        await close_db()
+        logger.info("application shutdown complete")
 
 
 app = FastAPI(
