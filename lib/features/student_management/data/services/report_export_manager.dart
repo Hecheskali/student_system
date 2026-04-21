@@ -1,10 +1,10 @@
-import 'dart:typed_data';
-
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../config/report_config.dart';
 import '../models/report_models.dart';
 import 'backend_report_service.dart';
+import 'report_file_saver.dart';
 import 'report_exporter.dart';
 
 /// Report export manager that handles both frontend and backend generation
@@ -68,7 +68,7 @@ class ReportExportManager {
         bytes: fileBytes,
       );
     } catch (e) {
-      print('Backend export failed: $e, falling back to frontend');
+      debugPrint('Backend export failed: $e, falling back to frontend');
       // Fallback to frontend on error
       return ReportExporter.exportReport(
         suggestedBaseName: suggestedBaseName,
@@ -85,16 +85,15 @@ class ReportExportManager {
     required Uint8List bytes,
   }) async {
     try {
-      final String extension = _getExtension(format);
-
-      // For web, we would handle this differently
-      // For mobile/desktop, use file_selector or path_provider
-
-      // This is a placeholder - implement per-platform logic
-      // For now, return the filename to indicate success
-      return '$filename.$extension';
+      return saveGeneratedReport(
+        suggestedName: '$filename.${_getExtension(format)}',
+        bytes: bytes,
+        formatLabel: format.label,
+        extension: _getExtension(format),
+        mimeType: format.mimeType,
+      );
     } catch (e) {
-      print('Error saving file: $e');
+      debugPrint('Error saving file: $e');
       return null;
     }
   }
@@ -149,7 +148,7 @@ class ReportExportManager {
         bytes: fileBytes,
       );
     } catch (e) {
-      print('Exam ledger export failed: $e');
+      debugPrint('Exam ledger export failed: $e');
       return null;
     }
   }

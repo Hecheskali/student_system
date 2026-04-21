@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
-import 'package:file_selector/file_selector.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+
+import '../../data/services/report_file_saver.dart';
 
 // Professional color scheme for reports
 class ReportColors {
@@ -617,24 +618,13 @@ class ReportExporter {
     required Uint8List bytes,
     required ReportFileFormat format,
   }) async {
-    final FileSaveLocation? location = await getSaveLocation(
+    return saveGeneratedReport(
       suggestedName: suggestedName,
-      acceptedTypeGroups: <XTypeGroup>[
-        XTypeGroup(label: format.label, extensions: <String>[format.extension]),
-      ],
-    );
-
-    if (location == null) {
-      return null;
-    }
-
-    final XFile file = XFile.fromData(
-      bytes,
+      bytes: bytes,
+      formatLabel: format.label,
+      extension: format.extension,
       mimeType: format.mimeType,
-      name: suggestedName,
     );
-    await file.saveTo(location.path);
-    return location.path;
   }
 
   static String _reportToCsv(ReportExportData report) {

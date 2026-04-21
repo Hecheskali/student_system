@@ -540,7 +540,7 @@ class _ModeBadge extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            hasLiveBackend ? 'Live Supabase Auth' : 'Preview Mode',
+            hasLiveBackend ? 'Live School Auth System' : 'Preview Mode',
             style: Theme.of(
               context,
             ).textTheme.labelLarge?.copyWith(color: tone),
