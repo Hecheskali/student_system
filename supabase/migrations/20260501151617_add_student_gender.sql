@@ -1,5 +1,5 @@
 alter table public.students
-add column if not exists gender text not null default 'female';
+add column if not exists gender text not null default '';
 
 with missing_admission_numbers as (
   select
