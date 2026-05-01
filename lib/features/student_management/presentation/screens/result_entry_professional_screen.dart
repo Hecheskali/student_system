@@ -25,7 +25,8 @@ class _ResultEntryProfessionalScreenState
   String? _selectedStudentId;
   String? _selectedSubject;
   ExamType? _selectedExamType;
-  final TextEditingController _marksController = TextEditingController();
+  final Map<String, TextEditingController> _markControllers =
+      <String, TextEditingController>{};
   bool _isUploading = false;
 
   @override
@@ -38,7 +39,7 @@ class _ResultEntryProfessionalScreenState
 
   @override
   void dispose() {
-    _marksController.dispose();
+    _disposeMarkControllers();
     super.dispose();
   }
 
@@ -127,7 +128,7 @@ class _ResultEntryProfessionalScreenState
                 _searchQuery = '';
                 _selectedSubject = null;
                 _selectedExamType = null;
-                _marksController.clear();
+                _disposeMarkControllers();
               });
             },
           ),
@@ -151,7 +152,6 @@ class _ResultEntryProfessionalScreenState
                 );
                 if (!selectedStillVisible) {
                   _selectedStudentId = null;
-                  _marksController.clear();
                 }
               });
             },
@@ -160,14 +160,14 @@ class _ResultEntryProfessionalScreenState
             onSubjectSelected: (String? subject) {
               setState(() {
                 _selectedSubject = subject;
-                _marksController.clear();
+                _disposeMarkControllers();
               });
             },
             selectedExamType: _selectedExamType,
             onExamTypeSelected: (ExamType? type) {
               setState(() {
                 _selectedExamType = type;
-                _marksController.clear();
+                _disposeMarkControllers();
               });
             },
           ),
@@ -177,17 +177,19 @@ class _ResultEntryProfessionalScreenState
             selectedStudentId: selectedStudent?.id,
             selectedSubject: activeSubject,
             selectedExamType: _selectedExamType,
-            marksController: _marksController,
+            enteredCount: _enteredMarkCount(filteredStudents),
+            markControllerFor: (StudentResultRecord student) =>
+                _markControllerFor(student, activeSubject, _selectedExamType),
             isUploading: _isUploading,
             onStudentSelected: (StudentResultRecord student) {
               setState(() {
                 _selectedStudentId = student.id;
-                _marksController.clear();
               });
             },
-            onUpload: selectedStudent == null
+            onMarkChanged: () => setState(() {}),
+            onUploadSheet: filteredStudents.isEmpty
                 ? null
-                : () => _uploadMarks(selectedStudent, activeSubject),
+                : () => _uploadSheet(filteredStudents, activeSubject),
           ),
         ],
       ),
@@ -247,28 +249,39 @@ class _ResultEntryProfessionalScreenState
     return subjects;
   }
 
-  Future<void> _uploadMarks(
-    StudentResultRecord student,
+  Future<void> _uploadSheet(
+    List<StudentResultRecord> students,
     String? activeSubject,
   ) async {
     if (activeSubject == null || _selectedExamType == null) {
       _showSnack(
-        message: 'Select a subject and exam type before uploading.',
+        message: 'Select a subject and exam type before uploading the sheet.',
         color: Colors.orange,
       );
       return;
     }
 
-    final String rawMarks = _marksController.text.trim();
-    if (rawMarks.isEmpty) {
-      _showSnack(message: 'Enter marks for the highlighted student.');
-      return;
-    }
+    final Map<StudentResultRecord, double> sheetMarks =
+        <StudentResultRecord, double>{};
+    for (final StudentResultRecord student in students) {
+      final String rawMarks = _markControllerFor(
+        student,
+        activeSubject,
+        _selectedExamType,
+      ).text.trim();
+      if (rawMarks.isEmpty) {
+        _showSnack(message: 'Enter marks for ${student.studentName}.');
+        return;
+      }
 
-    final double? marks = double.tryParse(rawMarks);
-    if (marks == null || marks < 0 || marks > 100) {
-      _showSnack(message: 'Marks must be a number from 0 to 100.');
-      return;
+      final double? marks = double.tryParse(rawMarks);
+      if (marks == null || marks < 0 || marks > 100) {
+        _showSnack(
+          message: 'Marks for ${student.studentName} must be 0 to 100.',
+        );
+        return;
+      }
+      sheetMarks[student] = marks;
     }
 
     setState(() => _isUploading = true);
@@ -278,35 +291,36 @@ class _ResultEntryProfessionalScreenState
       final String examLabel =
           '${_selectedExamType!.label} ${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}';
 
-      ref
-          .read(schoolAdminProvider.notifier)
-          .uploadScores(
-            studentId: student.id,
-            subject: activeSubject,
-            examMarks: <ExamMark>[
-              ExamMark(
-                id: 'exam-${now.microsecondsSinceEpoch}',
-                label: examLabel,
-                type: _selectedExamType!,
-                score: marks,
-                examDate: now,
-                uploadedAt: now,
-              ),
-            ],
-          );
+      final SchoolAdminController controller = ref.read(
+        schoolAdminProvider.notifier,
+      );
+      for (final MapEntry<StudentResultRecord, double> entry
+          in sheetMarks.entries) {
+        controller.uploadScores(
+          studentId: entry.key.id,
+          subject: activeSubject,
+          examMarks: <ExamMark>[
+            ExamMark(
+              id: 'exam-${now.microsecondsSinceEpoch}-${entry.key.id}',
+              label: examLabel,
+              type: _selectedExamType!,
+              score: entry.value,
+              examDate: now,
+              uploadedAt: now,
+            ),
+          ],
+        );
+      }
 
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _isUploading = false;
-        _marksController.clear();
-      });
+      setState(() => _isUploading = false);
 
       _showSnack(
         message:
-            'Uploaded successfully: ${student.studentName} - $activeSubject - ${marks.toStringAsFixed(1)}',
+            'Uploaded $activeSubject scores for ${sheetMarks.length} students.',
         color: Colors.green,
       );
     } catch (_) {
@@ -329,6 +343,51 @@ class _ResultEntryProfessionalScreenState
         duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  int _enteredMarkCount(List<StudentResultRecord> students) {
+    return students.where((StudentResultRecord student) {
+      return (_markControllers[student.id]?.text.trim().isNotEmpty ?? false);
+    }).length;
+  }
+
+  TextEditingController _markControllerFor(
+    StudentResultRecord student,
+    String? activeSubject,
+    ExamType? examType,
+  ) {
+    return _markControllers.putIfAbsent(student.id, () {
+      return TextEditingController(
+        text: _existingMarkText(student, activeSubject, examType),
+      );
+    });
+  }
+
+  String _existingMarkText(
+    StudentResultRecord student,
+    String? activeSubject,
+    ExamType? examType,
+  ) {
+    final SubjectResult? subject = _subjectResult(student, activeSubject);
+    if (subject == null) {
+      return '';
+    }
+    final List<ExamMark> marks = examType == null
+        ? subject.examMarks
+        : subject.examMarks
+              .where((ExamMark mark) => mark.type == examType)
+              .toList();
+    if (marks.isEmpty) {
+      return '';
+    }
+    return marks.last.score.toStringAsFixed(1);
+  }
+
+  void _disposeMarkControllers() {
+    for (final TextEditingController controller in _markControllers.values) {
+      controller.dispose();
+    }
+    _markControllers.clear();
   }
 }
 
@@ -602,20 +661,25 @@ class _ResultEntrySheet extends StatelessWidget {
     required this.selectedStudentId,
     required this.selectedSubject,
     required this.selectedExamType,
-    required this.marksController,
+    required this.enteredCount,
+    required this.markControllerFor,
     required this.isUploading,
     required this.onStudentSelected,
-    required this.onUpload,
+    required this.onMarkChanged,
+    required this.onUploadSheet,
   });
 
   final List<StudentResultRecord> students;
   final String? selectedStudentId;
   final String? selectedSubject;
   final ExamType? selectedExamType;
-  final TextEditingController marksController;
+  final int enteredCount;
+  final TextEditingController Function(StudentResultRecord student)
+  markControllerFor;
   final bool isUploading;
   final ValueChanged<StudentResultRecord> onStudentSelected;
-  final VoidCallback? onUpload;
+  final VoidCallback onMarkChanged;
+  final VoidCallback? onUploadSheet;
 
   @override
   Widget build(BuildContext context) {
@@ -658,13 +722,39 @@ class _ResultEntrySheet extends StatelessWidget {
                       selected: selected,
                       selectedSubject: selectedSubject,
                       selectedExamType: selectedExamType,
-                      marksController: marksController,
+                      marksController: markControllerFor(student),
                       isUploading: isUploading,
                       onTap: () => onStudentSelected(student),
-                      onUpload: selected ? onUpload : null,
+                      onMarkChanged: onMarkChanged,
                     ),
                   );
                 }),
+                const SizedBox(height: 10),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        '$enteredCount/${students.length} rows filled',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: isUploading ? null : onUploadSheet,
+                      icon: isUploading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.cloud_upload_rounded),
+                      label: Text(
+                        isUploading ? 'Uploading Sheet' : 'Upload Sheet',
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
         ],
@@ -690,7 +780,7 @@ class _SheetHeader extends StatelessWidget {
           Expanded(flex: 2, child: Text('Admission')),
           Expanded(flex: 2, child: Text('Current Result')),
           Expanded(flex: 2, child: Text('Mark')),
-          SizedBox(width: 150, child: Text('Action')),
+          SizedBox(width: 150, child: Text('Edit')),
         ],
       ),
     );
@@ -706,7 +796,7 @@ class _StudentResultEntryRow extends StatelessWidget {
     required this.marksController,
     required this.isUploading,
     required this.onTap,
-    required this.onUpload,
+    required this.onMarkChanged,
   });
 
   final StudentResultRecord student;
@@ -716,7 +806,7 @@ class _StudentResultEntryRow extends StatelessWidget {
   final TextEditingController marksController;
   final bool isUploading;
   final VoidCallback onTap;
-  final VoidCallback? onUpload;
+  final VoidCallback onMarkChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -797,43 +887,36 @@ class _StudentResultEntryRow extends StatelessWidget {
               ),
               Expanded(
                 flex: 2,
-                child: selected
-                    ? TextField(
-                        controller: marksController,
-                        enabled: !isUploading,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        inputFormatters: <TextInputFormatter>[
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                        ],
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          labelText: '0-100',
-                        ),
-                      )
-                    : const Text('Select row'),
+                child: TextField(
+                  controller: marksController,
+                  enabled: !isUploading,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  ],
+                  onTap: onTap,
+                  onChanged: (_) => onMarkChanged(),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: '0-100',
+                  ),
+                ),
               ),
               const SizedBox(width: 14),
               SizedBox(
                 width: 136,
                 child: selected
-                    ? FilledButton.icon(
-                        onPressed: isUploading ? null : onUpload,
-                        icon: isUploading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.cloud_upload_rounded),
-                        label: Text(isUploading ? 'Saving' : 'Upload'),
-                      )
-                    : FilledButton.tonal(
+                    ? FilledButton.tonalIcon(
                         onPressed: onTap,
-                        child: const Text('Select'),
+                        icon: const Icon(Icons.edit_note_rounded),
+                        label: const Text('Editing'),
+                      )
+                    : FilledButton.tonalIcon(
+                        onPressed: onTap,
+                        icon: const Icon(Icons.edit_rounded),
+                        label: const Text('Edit'),
                       ),
               ),
             ],
