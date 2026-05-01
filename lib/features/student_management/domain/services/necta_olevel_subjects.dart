@@ -158,6 +158,7 @@ const List<String> kNectaOLevelDefaultSubjectNames = <String>[
   'Computer Science',
   'Business Studies',
   'Historia ya Tanzania na Maadili',
+  'EDK',
   'Biology',
   'Basic Mathematics',
   'Physics',
