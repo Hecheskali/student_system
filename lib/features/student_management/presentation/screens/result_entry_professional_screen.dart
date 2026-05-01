@@ -73,10 +73,7 @@ class _ResultEntryProfessionalScreenState
                   record.className == _selectedClass,
             )
             .toList()
-          ..sort(
-            (StudentResultRecord a, StudentResultRecord b) =>
-                a.studentName.compareTo(b.studentName),
-          );
+          ..sort(compareStudentResultsForRoster);
 
     final List<StudentResultRecord> filteredStudents = _filterStudents(
       classStudents,

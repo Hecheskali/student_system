@@ -872,10 +872,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
     return allResults
         .where((StudentResultRecord record) => record.className == className)
         .toList()
-      ..sort(
-        (StudentResultRecord a, StudentResultRecord b) =>
-            a.studentName.compareTo(b.studentName),
-      );
+      ..sort(compareStudentResultsForRoster);
   }
 
   StudentResultRecord? _findRecord(
@@ -2380,10 +2377,7 @@ class _SubjectResultEntryWorkspaceState
                   ),
             )
             .toList()
-          ..sort(
-            (StudentResultRecord a, StudentResultRecord b) =>
-                a.studentName.compareTo(b.studentName),
-          );
+          ..sort(compareStudentResultsForRoster);
     final List<_ExistingSheetSession> availableSessions =
         _availableSubjectSessions(classStudents);
     final int completedRows = classStudents

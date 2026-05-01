@@ -33,17 +33,15 @@ class HistoricalImportParser {
       label: 'Historical results',
       extensions: const <String>['csv', 'xlsx'],
     );
-    final XFile? file = await openFile(acceptedTypeGroups: <XTypeGroup>[typeGroup]);
+    final XFile? file = await openFile(
+      acceptedTypeGroups: <XTypeGroup>[typeGroup],
+    );
     if (file == null) {
       return null;
     }
 
     final Uint8List bytes = await file.readAsBytes();
-    return parseFile(
-      fileName: file.name,
-      bytes: bytes,
-      session: session,
-    );
+    return parseFile(fileName: file.name, bytes: bytes, session: session);
   }
 
   static HistoricalImportPreview parseFile({
@@ -69,18 +67,25 @@ class HistoricalImportParser {
     final List<String> normalizedHeaders = headers
         .map((String item) => item.trim().toLowerCase())
         .toList();
-    final int admissionIndex = _indexFor(
-      normalizedHeaders,
-      const <String>['admission', 'admission number', 'adm'],
-    );
-    final int studentIndex = _indexFor(
-      normalizedHeaders,
-      const <String>['student', 'student name', 'name'],
-    );
-    final int classIndex = _indexFor(
-      normalizedHeaders,
-      const <String>['class', 'class name', 'stream'],
-    );
+    final int admissionIndex = _indexFor(normalizedHeaders, const <String>[
+      'admission',
+      'admission number',
+      'adm',
+    ]);
+    final int studentIndex = _indexFor(normalizedHeaders, const <String>[
+      'student',
+      'student name',
+      'name',
+    ]);
+    final int classIndex = _indexFor(normalizedHeaders, const <String>[
+      'class',
+      'class name',
+      'stream',
+    ]);
+    final int genderIndex = _indexFor(normalizedHeaders, const <String>[
+      'gender',
+      'sex',
+    ]);
 
     int warnings = 0;
     final List<StudentResultRecord> results = <StudentResultRecord>[];
@@ -99,13 +104,15 @@ class HistoricalImportParser {
       final String admission = _cell(row, admissionIndex);
       final String studentName = _cell(row, studentIndex);
       final String className = _cell(row, classIndex);
+      final StudentGender gender = genderIndex >= 0
+          ? _genderFromCell(_cell(row, genderIndex))
+          : StudentGender.female;
       final List<SubjectResult> subjects = <SubjectResult>[];
 
       for (final String subject in _subjects) {
-        final int subjectIndex = _indexFor(
-          normalizedHeaders,
-          <String>[subject.toLowerCase()],
-        );
+        final int subjectIndex = _indexFor(normalizedHeaders, <String>[
+          subject.toLowerCase(),
+        ]);
         if (subjectIndex < 0) {
           continue;
         }
@@ -131,6 +138,7 @@ class HistoricalImportParser {
           admissionNumber: admission,
           studentName: studentName,
           className: className,
+          gender: gender,
           subjectResults: subjects,
         ),
       );
@@ -149,14 +157,17 @@ class HistoricalImportParser {
     return LineSplitter.split(text)
         .where((String line) => line.trim().isNotEmpty)
         .map(
-          (String line) => line.split(',').map((String cell) => cell.trim()).toList(),
+          (String line) =>
+              line.split(',').map((String cell) => cell.trim()).toList(),
         )
         .toList();
   }
 
   static List<List<String>> _parseExcel(Uint8List bytes) {
     final Excel excel = Excel.decodeBytes(bytes);
-    final String? defaultSheet = excel.tables.keys.isEmpty ? null : excel.tables.keys.first;
+    final String? defaultSheet = excel.tables.keys.isEmpty
+        ? null
+        : excel.tables.keys.first;
     if (defaultSheet == null) {
       return const <List<String>>[];
     }
@@ -195,9 +206,7 @@ class HistoricalImportParser {
     required double score,
   }) {
     final double clamped = score.clamp(0, 100).toDouble();
-    final double average = double.parse(
-      clamped.toStringAsFixed(1),
-    );
+    final double average = double.parse(clamped.toStringAsFixed(1));
     final NectaOLevelGrade grade = NectaOLevelCalculator.gradeForScore(average);
 
     return SubjectResult(
@@ -233,27 +242,28 @@ class HistoricalImportParser {
     required String admissionNumber,
     required String studentName,
     required String className,
+    required StudentGender gender,
     required List<SubjectResult> subjectResults,
   }) {
     final NectaOLevelDivisionSummary divisionSummary =
         NectaOLevelCalculator.divisionForSubjects(subjectResults);
     final double averageScore = double.parse(
-      (
-        subjectResults.fold<double>(
-              0,
-              (double total, SubjectResult subject) => total + subject.averageScore,
-            ) /
-            subjectResults.length
-      ).toStringAsFixed(1),
+      (subjectResults.fold<double>(
+                0,
+                (double total, SubjectResult subject) =>
+                    total + subject.averageScore,
+              ) /
+              subjectResults.length)
+          .toStringAsFixed(1),
     );
     final double interExamAverage = double.parse(
-      (
-        subjectResults.fold<double>(
-              0,
-              (double total, SubjectResult subject) => total + subject.interExamScore,
-            ) /
-            subjectResults.length
-      ).toStringAsFixed(1),
+      (subjectResults.fold<double>(
+                0,
+                (double total, SubjectResult subject) =>
+                    total + subject.interExamScore,
+              ) /
+              subjectResults.length)
+          .toStringAsFixed(1),
     );
     final RiskLevel riskLevel = averageScore < 45
         ? RiskLevel.urgent
@@ -266,6 +276,7 @@ class HistoricalImportParser {
       admissionNumber: admissionNumber,
       studentName: studentName,
       className: className,
+      gender: gender,
       averageScore: averageScore,
       interExamAverage: interExamAverage,
       division: divisionSummary.division,
@@ -273,12 +284,31 @@ class HistoricalImportParser {
       attendanceRate: 90,
       subjectResults: subjectResults,
       performanceTrend: <ScorePoint>[
-        ScorePoint(label: 'Term 1', value: (averageScore - 5).clamp(0, 100).toDouble()),
-        ScorePoint(label: 'Inter', value: (averageScore - 2).clamp(0, 100).toDouble()),
-        ScorePoint(label: 'Term 2', value: (averageScore - 1).clamp(0, 100).toDouble()),
+        ScorePoint(
+          label: 'Term 1',
+          value: (averageScore - 5).clamp(0, 100).toDouble(),
+        ),
+        ScorePoint(
+          label: 'Inter',
+          value: (averageScore - 2).clamp(0, 100).toDouble(),
+        ),
+        ScorePoint(
+          label: 'Term 2',
+          value: (averageScore - 1).clamp(0, 100).toDouble(),
+        ),
         ScorePoint(label: 'Current', value: averageScore),
       ],
       riskLevel: riskLevel,
     );
+  }
+
+  static StudentGender _genderFromCell(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'male':
+      case 'm':
+        return StudentGender.male;
+      default:
+        return StudentGender.female;
+    }
   }
 }

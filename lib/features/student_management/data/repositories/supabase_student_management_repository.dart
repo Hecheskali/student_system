@@ -13,73 +13,58 @@ class SupabaseStudentManagementRepository
 
   @override
   Future<List<District>> getDistricts() async {
-    return _safe(
-      () async {
-        final List<Map<String, dynamic>> rows = await _selectRows('districts');
-        return rows.map(_districtFromRow).toList(growable: false);
-      },
-      fallback: const <District>[],
-    );
+    return _safe(() async {
+      final List<Map<String, dynamic>> rows = await _selectRows('districts');
+      return rows.map(_districtFromRow).toList(growable: false);
+    }, fallback: const <District>[]);
   }
 
   @override
   Future<List<School>> getSchools(String districtId) async {
-    return _safe(
-      () async {
-        final List<Map<String, dynamic>> rows = await _selectRows(
-          'schools',
-          filterColumn: 'district_id',
-          filterValue: districtId,
-        );
-        return rows.map(_schoolFromRow).toList(growable: false);
-      },
-      fallback: const <School>[],
-    );
+    return _safe(() async {
+      final List<Map<String, dynamic>> rows = await _selectRows(
+        'schools',
+        filterColumn: 'district_id',
+        filterValue: districtId,
+      );
+      return rows.map(_schoolFromRow).toList(growable: false);
+    }, fallback: const <School>[]);
   }
 
   @override
   Future<List<SchoolClass>> getClasses(String schoolId) async {
-    return _safe(
-      () async {
-        final List<Map<String, dynamic>> rows = await _selectRows(
-          'classes',
-          filterColumn: 'school_id',
-          filterValue: schoolId,
-        );
-        return rows.map(_classFromRow).toList(growable: false);
-      },
-      fallback: const <SchoolClass>[],
-    );
+    return _safe(() async {
+      final List<Map<String, dynamic>> rows = await _selectRows(
+        'classes',
+        filterColumn: 'school_id',
+        filterValue: schoolId,
+      );
+      return rows.map(_classFromRow).toList(growable: false);
+    }, fallback: const <SchoolClass>[]);
   }
 
   @override
   Future<List<Student>> getStudents(String classId) async {
-    return _safe(
-      () async {
-        final List<Map<String, dynamic>> rows = await _selectRows(
-          'students',
-          filterColumn: 'class_id',
-          filterValue: classId,
-        );
-        return rows.map(_studentFromRow).toList(growable: false);
-      },
-      fallback: const <Student>[],
-    );
+    return _safe(() async {
+      final List<Map<String, dynamic>> rows = await _selectRows(
+        'students',
+        filterColumn: 'class_id',
+        filterValue: classId,
+      );
+      return rows.map(_studentFromRow).toList(growable: false);
+    }, fallback: const <Student>[]);
   }
 
   @override
   Future<Student?> getStudent(String studentId) async {
-    return _safe(
-      () async {
-        final Map<String, dynamic>? row = await _maybeSingleRow(
-          'students',
-          filterColumn: 'id',
-          filterValue: studentId,
-        );
-        return row == null ? null : _studentFromRow(row);
-      },
-      fallback: null,
-    );
+    return _safe(() async {
+      final Map<String, dynamic>? row = await _maybeSingleRow(
+        'students',
+        filterColumn: 'id',
+        filterValue: studentId,
+      );
+      return row == null ? null : _studentFromRow(row);
+    }, fallback: null);
   }
 
   @override
@@ -112,7 +97,10 @@ class SupabaseStudentManagementRepository
           );
         }
 
-        final Student focusStudent = students.reduce((Student current, Student next) {
+        final Student focusStudent = students.reduce((
+          Student current,
+          Student next,
+        ) {
           if (next.riskLevel == RiskLevel.urgent &&
               current.riskLevel != RiskLevel.urgent) {
             return next;
@@ -194,7 +182,8 @@ class SupabaseStudentManagementRepository
 
         Iterable<Student> scopedStudents = students;
         String title = 'System overview';
-        String subtitle = 'District-wide readiness, attendance, and learner risk.';
+        String subtitle =
+            'District-wide readiness, attendance, and learner risk.';
 
         if (request.studentId != null) {
           final Student? student = _findById(
@@ -302,13 +291,19 @@ class SupabaseStudentManagementRepository
           topPerformer: topPerformer.fullName,
           riskDistribution: <String, int>{
             'Stable': list
-                .where((Student student) => student.riskLevel == RiskLevel.stable)
+                .where(
+                  (Student student) => student.riskLevel == RiskLevel.stable,
+                )
                 .length,
             'Watch': list
-                .where((Student student) => student.riskLevel == RiskLevel.watch)
+                .where(
+                  (Student student) => student.riskLevel == RiskLevel.watch,
+                )
                 .length,
             'Urgent': list
-                .where((Student student) => student.riskLevel == RiskLevel.urgent)
+                .where(
+                  (Student student) => student.riskLevel == RiskLevel.urgent,
+                )
                 .length,
           },
           trend: _systemTrend(list),
@@ -322,11 +317,7 @@ class SupabaseStudentManagementRepository
         averageScore: 0,
         atRiskStudents: 0,
         topPerformer: 'N/A',
-        riskDistribution: <String, int>{
-          'Stable': 0,
-          'Watch': 0,
-          'Urgent': 0,
-        },
+        riskDistribution: <String, int>{'Stable': 0, 'Watch': 0, 'Urgent': 0},
         trend: <ScorePoint>[],
       ),
     );
@@ -354,34 +345,36 @@ class SupabaseStudentManagementRepository
       fallback: const <Map<String, dynamic>>[],
     );
 
-    return rows.map((Map<String, dynamic> row) {
-      return StudentMasterRecord(
-        id: _string(row, 'id'),
-        admissionNumber: _string(row, 'admission_number'),
-        fullName: _string(row, 'full_name'),
-        formLevel: _string(row, 'grade_level'),
-        className: _string(row, 'class_name'),
-        guardianName: '',
-        guardianPhone: '',
-        gender: StudentGender.female,
-        dateOfBirth: DateTime(2009, 1, 1),
-        admissionDate: DateTime.now(),
-        status: StudentStatus.active,
-        subjectCombination: _listValue(row, 'subjects')
-            .map<String>((dynamic value) => value.toString())
-            .toList(growable: false),
-        notes: '',
-        latestAverage: _doubleValue(row, 'average_score'),
-        latestDivision: _string(
-          _mapValue(row, 'student_profile'),
-          'division',
-          fallback: 'Division 0',
-        ),
-        riskLevel: _riskLevelFromString(
-          _string(row, 'risk_level', fallback: 'stable'),
-        ),
-      );
-    }).toList(growable: false);
+    return rows
+        .map((Map<String, dynamic> row) {
+          return StudentMasterRecord(
+            id: _string(row, 'id'),
+            admissionNumber: _string(row, 'admission_number'),
+            fullName: _string(row, 'full_name'),
+            formLevel: _string(row, 'grade_level'),
+            className: _string(row, 'class_name'),
+            guardianName: '',
+            guardianPhone: '',
+            gender: _studentGenderFromString(_string(row, 'gender')),
+            dateOfBirth: DateTime(2009, 1, 1),
+            admissionDate: DateTime.now(),
+            status: StudentStatus.active,
+            subjectCombination: _listValue(row, 'subjects')
+                .map<String>((dynamic value) => value.toString())
+                .toList(growable: false),
+            notes: '',
+            latestAverage: _doubleValue(row, 'average_score'),
+            latestDivision: _string(
+              _mapValue(row, 'student_profile'),
+              'division',
+              fallback: 'Division 0',
+            ),
+            riskLevel: _riskLevelFromString(
+              _string(row, 'risk_level', fallback: 'stable'),
+            ),
+          );
+        })
+        .toList(growable: false);
   }
 
   @override
@@ -420,23 +413,25 @@ class SupabaseStudentManagementRepository
       fallback: const <Map<String, dynamic>>[],
     );
 
-    return rows.map((Map<String, dynamic> row) {
-      final String subject = _string(row, 'subject');
-      return TeacherBiography(
-        id: _string(row, 'id'),
-        name: _string(row, 'name'),
-        subject: subject,
-        assignedClass: _string(row, 'assigned_class'),
-        roleTitle: subject.isEmpty ? 'Teacher' : '$subject Teacher',
-        biography: '',
-        qualifications: '',
-        yearsOfService: 0,
-        photoUrl: '',
-        introVideoUrl: '',
-        galleryImageUrls: const <String>[],
-        galleryVideoUrls: const <String>[],
-      );
-    }).toList(growable: false);
+    return rows
+        .map((Map<String, dynamic> row) {
+          final String subject = _string(row, 'subject');
+          return TeacherBiography(
+            id: _string(row, 'id'),
+            name: _string(row, 'name'),
+            subject: subject,
+            assignedClass: _string(row, 'assigned_class'),
+            roleTitle: subject.isEmpty ? 'Teacher' : '$subject Teacher',
+            biography: '',
+            qualifications: '',
+            yearsOfService: 0,
+            photoUrl: '',
+            introVideoUrl: '',
+            galleryImageUrls: const <String>[],
+            galleryVideoUrls: const <String>[],
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<T> _safe<T>(Future<T> Function() action, {required T fallback}) async {
@@ -545,10 +540,7 @@ class SupabaseStudentManagementRepository
   }
 
   Student _studentFromRow(Map<String, dynamic> row) {
-    final Map<String, dynamic> subjectScores = _mapValue(
-      row,
-      'subject_scores',
-    );
+    final Map<String, dynamic> subjectScores = _mapValue(row, 'subject_scores');
     final List<dynamic> monthlyPerformance = _listValue(
       row,
       'monthly_performance',
@@ -560,6 +552,9 @@ class SupabaseStudentManagementRepository
       schoolId: _string(row, 'school_id'),
       classId: _string(row, 'class_id'),
       fullName: _string(row, 'full_name'),
+      gender: _studentGenderFromString(_string(row, 'gender')),
+      className: _string(row, 'class_name'),
+      admissionNumber: _string(row, 'admission_number'),
       gradeLevel: _string(row, 'grade_level', fallback: 'Unknown class'),
       averageScore: _doubleValue(row, 'average_score'),
       gpa: _doubleValue(row, 'gpa'),
@@ -604,7 +599,10 @@ class SupabaseStudentManagementRepository
       return const <ScorePoint>[];
     }
 
-    final int longestSeries = students.fold<int>(0, (int current, Student next) {
+    final int longestSeries = students.fold<int>(0, (
+      int current,
+      Student next,
+    ) {
       return next.monthlyPerformance.length > current
           ? next.monthlyPerformance.length
           : current;
@@ -615,10 +613,7 @@ class SupabaseStudentManagementRepository
           .where((Student student) => student.monthlyPerformance.length > index)
           .map((Student student) => student.monthlyPerformance[index])
           .toList(growable: false);
-      return ScorePoint(
-        label: 'P${index + 1}',
-        value: _average(values),
-      );
+      return ScorePoint(label: 'P${index + 1}', value: _average(values));
     });
   }
 
@@ -637,11 +632,7 @@ class SupabaseStudentManagementRepository
     return Map<String, dynamic>.from(row as Map);
   }
 
-  String _string(
-    Map<String, dynamic> row,
-    String key, {
-    String fallback = '',
-  }) {
+  String _string(Map<String, dynamic> row, String key, {String fallback = ''}) {
     final dynamic value = row[key];
     if (value == null) {
       return fallback;
@@ -698,6 +689,16 @@ class SupabaseStudentManagementRepository
         return RiskLevel.watch;
       default:
         return RiskLevel.stable;
+    }
+  }
+
+  StudentGender _studentGenderFromString(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'male':
+      case 'm':
+        return StudentGender.male;
+      default:
+        return StudentGender.female;
     }
   }
 }

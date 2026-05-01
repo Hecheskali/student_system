@@ -6,8 +6,6 @@ enum ExamSessionType { monthly, midterm, terminal, mock, national, custom }
 
 enum ImportBatchStatus { staged, validated, imported }
 
-enum StudentGender { female, male }
-
 enum StudentStatus { active, transferred, graduated, alumni }
 
 enum RecommendationTarget { student, teacher, schoolClass, school }
@@ -42,17 +40,6 @@ extension ImportBatchStatusX on ImportBatchStatus {
         return 'Validated';
       case ImportBatchStatus.imported:
         return 'Imported';
-    }
-  }
-}
-
-extension StudentGenderX on StudentGender {
-  String get label {
-    switch (this) {
-      case StudentGender.female:
-        return 'Female';
-      case StudentGender.male:
-        return 'Male';
     }
   }
 }

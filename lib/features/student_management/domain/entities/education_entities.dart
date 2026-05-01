@@ -10,6 +10,8 @@ enum ExamType { midTerm, annual, classExam, teacherNamed }
 
 enum ExamComponent { overall, theory, practical }
 
+enum StudentGender { female, male }
+
 extension UserRoleX on UserRole {
   String get label {
     switch (this) {
@@ -86,6 +88,17 @@ extension ExamComponentX on ExamComponent {
         return 'Theory';
       case ExamComponent.practical:
         return 'Practical';
+    }
+  }
+}
+
+extension StudentGenderX on StudentGender {
+  String get label {
+    switch (this) {
+      case StudentGender.female:
+        return 'Female';
+      case StudentGender.male:
+        return 'Male';
     }
   }
 }
@@ -180,6 +193,9 @@ class Student {
     required this.schoolId,
     required this.classId,
     required this.fullName,
+    this.gender = StudentGender.female,
+    this.className = '',
+    this.admissionNumber = '',
     required this.gradeLevel,
     required this.averageScore,
     required this.gpa,
@@ -194,6 +210,9 @@ class Student {
   final String schoolId;
   final String classId;
   final String fullName;
+  final StudentGender gender;
+  final String className;
+  final String admissionNumber;
   final String gradeLevel;
   final double averageScore;
   final double gpa;
@@ -600,6 +619,7 @@ class StudentResultRecord {
     required this.admissionNumber,
     required this.studentName,
     required this.className,
+    this.gender = StudentGender.female,
     required this.averageScore,
     required this.interExamAverage,
     required this.division,
@@ -614,6 +634,7 @@ class StudentResultRecord {
   final String admissionNumber;
   final String studentName;
   final String className;
+  final StudentGender gender;
   final double averageScore;
   final double interExamAverage;
   final String division;
@@ -639,6 +660,7 @@ class StudentResultRecord {
     String? admissionNumber,
     String? studentName,
     String? className,
+    StudentGender? gender,
     double? averageScore,
     double? interExamAverage,
     String? division,
@@ -653,6 +675,7 @@ class StudentResultRecord {
       admissionNumber: admissionNumber ?? this.admissionNumber,
       studentName: studentName ?? this.studentName,
       className: className ?? this.className,
+      gender: gender ?? this.gender,
       averageScore: averageScore ?? this.averageScore,
       interExamAverage: interExamAverage ?? this.interExamAverage,
       division: division ?? this.division,
@@ -664,6 +687,40 @@ class StudentResultRecord {
     );
   }
 }
+
+int compareStudentResultsForRoster(
+  StudentResultRecord first,
+  StudentResultRecord second,
+) {
+  final int genderCompare = _genderSortValue(
+    first.gender,
+  ).compareTo(_genderSortValue(second.gender));
+  if (genderCompare != 0) {
+    return genderCompare;
+  }
+
+  final int nameCompare = _rosterSortKey(
+    first.studentName,
+  ).compareTo(_rosterSortKey(second.studentName));
+  if (nameCompare != 0) {
+    return nameCompare;
+  }
+
+  return _rosterSortKey(
+    first.admissionNumber,
+  ).compareTo(_rosterSortKey(second.admissionNumber));
+}
+
+int _genderSortValue(StudentGender gender) {
+  switch (gender) {
+    case StudentGender.female:
+      return 0;
+    case StudentGender.male:
+      return 1;
+  }
+}
+
+String _rosterSortKey(String value) => value.trim().toUpperCase();
 
 @immutable
 class SubjectPerformanceSummary {

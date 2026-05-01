@@ -97,10 +97,7 @@ class _AllResultsScreenState extends ConsumerState<AllResultsScreen> {
                     _formLabelFor(record.className) == _selectedForm,
               )
               .toList()
-            ..sort(
-              (StudentResultRecord a, StudentResultRecord b) =>
-                  a.studentName.compareTo(b.studentName),
-            ));
+            ..sort(compareStudentResultsForRoster));
     final List<String> matrixSubjects =
         formResults
             .expand((StudentResultRecord record) => record.subjectResults)

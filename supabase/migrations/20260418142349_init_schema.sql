@@ -93,9 +93,10 @@ create table if not exists public.students (
   school_id uuid references public.schools(id) on delete set null,
   class_id uuid references public.classes(id) on delete set null,
   full_name text not null,
-  admission_number text unique,
+  admission_number text not null unique,
+  gender text not null default 'female',
   grade_level text not null default '',
-  class_name text,
+  class_name text not null default '',
   average_score double precision not null default 0,
   gpa double precision not null default 0,
   attendance_rate double precision not null default 0,
@@ -107,7 +108,9 @@ create table if not exists public.students (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   constraint students_risk_level_check
-    check (risk_level in ('stable', 'watch', 'urgent'))
+    check (risk_level in ('stable', 'watch', 'urgent')),
+  constraint students_gender_check
+    check (gender in ('female', 'male'))
 );
 
 create table if not exists public.exams (
@@ -159,6 +162,8 @@ create index if not exists classes_district_id_idx on public.classes(district_id
 create index if not exists students_class_id_idx on public.students(class_id);
 create index if not exists students_school_id_idx on public.students(school_id);
 create index if not exists students_district_id_idx on public.students(district_id);
+create index if not exists students_class_gender_name_idx
+on public.students(class_name, gender, full_name);
 create index if not exists teachers_user_id_idx on public.teachers(user_id);
 create index if not exists results_student_id_idx on public.results(student_id);
 create index if not exists results_exam_id_idx on public.results(exam_id);

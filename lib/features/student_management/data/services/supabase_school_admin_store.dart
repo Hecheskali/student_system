@@ -62,7 +62,8 @@ class SupabaseSchoolAdminStore {
       String headmasterName,
       ResultWindowSettings resultWindow,
       SchoolSettings settings,
-    }) config = await _loadConfig(fallbackState: fallbackState);
+    })
+    config = await _loadConfig(fallbackState: fallbackState);
 
     await ensureReferenceData(
       schoolName: config.schoolName,
@@ -118,9 +119,7 @@ class SupabaseSchoolAdminStore {
     await saveSettings(
       schoolName: draft.schoolName,
       districtName: draft.districtName,
-      headmasterName: draft.role == UserRole.headOfSchool
-          ? draft.name
-          : null,
+      headmasterName: draft.role == UserRole.headOfSchool ? draft.name : null,
       resultWindow: resultWindow,
       settings: settings,
     );
@@ -271,16 +270,13 @@ class SupabaseSchoolAdminStore {
       payload['headmaster_name'] = headmasterName;
     }
 
-    await _client.from('settings').upsert(
-      <String, dynamic>{
-        'id': 'deadlines',
-        'upload_deadline': resultWindow.uploadDeadline.toIso8601String(),
-        'edit_deadline': resultWindow.editDeadline.toIso8601String(),
-        'editing_locked': resultWindow.editingLocked,
-        'payload': payload,
-      },
-      onConflict: 'id',
-    );
+    await _client.from('settings').upsert(<String, dynamic>{
+      'id': 'deadlines',
+      'upload_deadline': resultWindow.uploadDeadline.toIso8601String(),
+      'edit_deadline': resultWindow.editDeadline.toIso8601String(),
+      'editing_locked': resultWindow.editingLocked,
+      'payload': payload,
+    }, onConflict: 'id');
   }
 
   Future<List<TeacherAccount>> loadTeachers() async {
@@ -344,14 +340,12 @@ class SupabaseSchoolAdminStore {
     final dynamic response = await _client
         .from('students')
         .select()
-        .order('created_at');
+        .order('class_name')
+        .order('gender')
+        .order('full_name');
     final List<dynamic> rows = List<dynamic>.from(response as List);
     return rows
-        .map(
-          (dynamic row) => _studentRecordFromRow(
-            _asMap(row),
-          ),
-        )
+        .map((dynamic row) => _studentRecordFromRow(_asMap(row)))
         .toList(growable: false);
   }
 
@@ -360,15 +354,12 @@ class SupabaseSchoolAdminStore {
     required String schoolName,
     required String districtName,
   }) async {
-    final ({
-      String districtId,
-      String schoolId,
-      String classId,
-    }) hierarchy = await _resolveHierarchy(
-      schoolName: schoolName,
-      districtName: districtName,
-      className: record.className,
-    );
+    final ({String districtId, String schoolId, String classId}) hierarchy =
+        await _resolveHierarchy(
+          schoolName: schoolName,
+          districtName: districtName,
+          className: record.className,
+        );
 
     final Map<String, dynamic> payload = <String, dynamic>{
       if (_looksLikeUuid(record.id)) 'id': record.id,
@@ -377,6 +368,7 @@ class SupabaseSchoolAdminStore {
       'class_id': hierarchy.classId,
       'full_name': record.studentName,
       'admission_number': record.admissionNumber,
+      'gender': record.gender.name,
       'grade_level': _gradeLevelForClass(record.className),
       'class_name': record.className,
       'average_score': record.averageScore,
@@ -430,15 +422,16 @@ class SupabaseSchoolAdminStore {
     }
   }
 
-  Future<({
-    String schoolName,
-    String districtName,
-    String headmasterName,
-    ResultWindowSettings resultWindow,
-    SchoolSettings settings,
-  })> _loadConfig({
-    required SchoolAdminState fallbackState,
-  }) async {
+  Future<
+    ({
+      String schoolName,
+      String districtName,
+      String headmasterName,
+      ResultWindowSettings resultWindow,
+      SchoolSettings settings,
+    })
+  >
+  _loadConfig({required SchoolAdminState fallbackState}) async {
     final dynamic row = await _client
         .from('settings')
         .select()
@@ -632,7 +625,10 @@ class SupabaseSchoolAdminStore {
     );
   }
 
-  Future<TeacherAccount?> _loadTeacherForUser(String userId, String email) async {
+  Future<TeacherAccount?> _loadTeacherForUser(
+    String userId,
+    String email,
+  ) async {
     final Map<String, dynamic>? byUser = await _findTeacher(
       userId: userId,
       email: null,
@@ -694,11 +690,8 @@ class SupabaseSchoolAdminStore {
     return null;
   }
 
-  Future<({
-    String districtId,
-    String schoolId,
-    String classId,
-  })> _resolveHierarchy({
+  Future<({String districtId, String schoolId, String classId})>
+  _resolveHierarchy({
     required String schoolName,
     required String districtName,
     required String className,
@@ -836,8 +829,9 @@ class SupabaseSchoolAdminStore {
 
   StudentResultRecord _studentRecordFromRow(Map<String, dynamic> row) {
     final Map<String, dynamic> profile = _mapValue(row['student_profile']);
-    final List<SubjectResult> subjectResults =
-        _subjectResultsFromPayload(profile['subject_results']);
+    final List<SubjectResult> subjectResults = _subjectResultsFromPayload(
+      profile['subject_results'],
+    );
     final List<ScorePoint> performanceTrend = _scorePointsFromPayload(
       profile['performance_trend'],
       fallbackValues: _doubleList(row['monthly_performance']),
@@ -858,6 +852,9 @@ class SupabaseSchoolAdminStore {
       admissionNumber: _stringValue(row, 'admission_number'),
       studentName: _stringValue(row, 'full_name'),
       className: _stringValue(row, 'class_name'),
+      gender: _studentGenderFromString(
+        _stringValue(row, 'gender', fallback: _stringValue(profile, 'gender')),
+      ),
       averageScore: _doubleValue(row, 'average_score'),
       interExamAverage: _doubleValue(
         profile,
@@ -868,11 +865,7 @@ class SupabaseSchoolAdminStore {
           }),
         ),
       ),
-      division: _stringValue(
-        profile,
-        'division',
-        fallback: division.division,
-      ),
+      division: _stringValue(profile, 'division', fallback: division.division),
       divisionPoints: _intValue(
         profile,
         'division_points',
@@ -914,7 +907,10 @@ class SupabaseSchoolAdminStore {
             .eq('exam_type', anchor.type.name)
             .eq(
               'exam_date',
-              (anchor.examDate ?? DateTime.now()).toIso8601String().split('T').first,
+              (anchor.examDate ?? DateTime.now())
+                  .toIso8601String()
+                  .split('T')
+                  .first,
             )
             .limit(1)
             .maybeSingle();
@@ -961,38 +957,43 @@ class SupabaseSchoolAdminStore {
                   .single();
 
         final String examId = _stringValue(_asMap(savedExam), 'id');
-        await _client.from('results').delete().eq('exam_id', examId).eq(
-          'student_id',
-          record.id,
-        );
+        await _client
+            .from('results')
+            .delete()
+            .eq('exam_id', examId)
+            .eq('student_id', record.id);
 
         if (group.isEmpty) {
           continue;
         }
 
-        await _client.from('results').insert(
-          group.map((ExamMark mark) {
-            return <String, dynamic>{
-              'student_id': record.id,
-              'exam_id': examId,
-              'class_id': classId,
-              'subject': subject.subject,
-              'exam_type': mark.type.name,
-              'component': mark.component.name,
-              'label': mark.label,
-              'score': mark.score,
-              'average_score': subject.averageScore,
-              'division': record.division,
-              'payload': <String, dynamic>{
-                'session_key': mark.sessionKey,
-                'teacher_id': mark.teacherId,
-                'teacher_name': mark.teacherName,
-                'exam_date': mark.examDate?.toIso8601String(),
-                'uploaded_at': mark.uploadedAt?.toIso8601String(),
-              },
-            };
-          }).toList(growable: false),
-        );
+        await _client
+            .from('results')
+            .insert(
+              group
+                  .map((ExamMark mark) {
+                    return <String, dynamic>{
+                      'student_id': record.id,
+                      'exam_id': examId,
+                      'class_id': classId,
+                      'subject': subject.subject,
+                      'exam_type': mark.type.name,
+                      'component': mark.component.name,
+                      'label': mark.label,
+                      'score': mark.score,
+                      'average_score': subject.averageScore,
+                      'division': record.division,
+                      'payload': <String, dynamic>{
+                        'session_key': mark.sessionKey,
+                        'teacher_id': mark.teacherId,
+                        'teacher_name': mark.teacherName,
+                        'exam_date': mark.examDate?.toIso8601String(),
+                        'uploaded_at': mark.uploadedAt?.toIso8601String(),
+                      },
+                    };
+                  })
+                  .toList(growable: false),
+            );
       }
     }
   }
@@ -1002,9 +1003,12 @@ Map<String, dynamic> _studentProfilePayload(StudentResultRecord record) {
   return <String, dynamic>{
     'division': record.division,
     'division_points': record.divisionPoints,
+    'gender': record.gender.name,
     'inter_exam_average': record.interExamAverage,
     'subject_results': record.subjectResults.map(_subjectPayload).toList(),
-    'performance_trend': record.performanceTrend.map(_scorePointPayload).toList(),
+    'performance_trend': record.performanceTrend
+        .map(_scorePointPayload)
+        .toList(),
   };
 }
 
@@ -1043,27 +1047,31 @@ List<SubjectResult> _subjectResultsFromPayload(dynamic value) {
     return const <SubjectResult>[];
   }
 
-  return value.map((dynamic item) {
-    final Map<String, dynamic> row = _mapValue(item);
-    final List<ExamMark> examMarks = _examMarksFromPayload(row['exam_marks']);
-    final double averageScore = _doubleValue(
-      row,
-      'average_score',
-      fallback: _average(examMarks.map((ExamMark mark) => mark.score)),
-    );
-    final NectaOLevelGrade grade = NectaOLevelCalculator.gradeForScore(
-      averageScore,
-    );
+  return value
+      .map((dynamic item) {
+        final Map<String, dynamic> row = _mapValue(item);
+        final List<ExamMark> examMarks = _examMarksFromPayload(
+          row['exam_marks'],
+        );
+        final double averageScore = _doubleValue(
+          row,
+          'average_score',
+          fallback: _average(examMarks.map((ExamMark mark) => mark.score)),
+        );
+        final NectaOLevelGrade grade = NectaOLevelCalculator.gradeForScore(
+          averageScore,
+        );
 
-    return SubjectResult(
-      subject: _stringValue(row, 'subject'),
-      examMarks: examMarks,
-      averageScore: averageScore,
-      grade: _stringValue(row, 'grade', fallback: grade.letter),
-      gradePoint: _intValue(row, 'grade_point', fallback: grade.point),
-      isCoreSubject: _boolValue(row, 'is_core_subject', fallback: true),
-    );
-  }).toList(growable: false);
+        return SubjectResult(
+          subject: _stringValue(row, 'subject'),
+          examMarks: examMarks,
+          averageScore: averageScore,
+          grade: _stringValue(row, 'grade', fallback: grade.letter),
+          gradePoint: _intValue(row, 'grade_point', fallback: grade.point),
+          isCoreSubject: _boolValue(row, 'is_core_subject', fallback: true),
+        );
+      })
+      .toList(growable: false);
 }
 
 List<ExamMark> _examMarksFromPayload(dynamic value) {
@@ -1071,23 +1079,27 @@ List<ExamMark> _examMarksFromPayload(dynamic value) {
     return const <ExamMark>[];
   }
 
-  return value.map((dynamic item) {
-    final Map<String, dynamic> row = _mapValue(item);
-    return ExamMark(
-      id: _stringValue(row, 'id'),
-      label: _stringValue(row, 'label'),
-      type: _examTypeFromString(_stringValue(row, 'type', fallback: 'classExam')),
-      score: _doubleValue(row, 'score'),
-      component: _examComponentFromString(
-        _stringValue(row, 'component', fallback: 'overall'),
-      ),
-      sessionKey: _nullableString(row['session_key']),
-      teacherId: _nullableString(row['teacher_id']),
-      teacherName: _nullableString(row['teacher_name']),
-      examDate: _nullableDateTime(row['exam_date']),
-      uploadedAt: _nullableDateTime(row['uploaded_at']),
-    );
-  }).toList(growable: false);
+  return value
+      .map((dynamic item) {
+        final Map<String, dynamic> row = _mapValue(item);
+        return ExamMark(
+          id: _stringValue(row, 'id'),
+          label: _stringValue(row, 'label'),
+          type: _examTypeFromString(
+            _stringValue(row, 'type', fallback: 'classExam'),
+          ),
+          score: _doubleValue(row, 'score'),
+          component: _examComponentFromString(
+            _stringValue(row, 'component', fallback: 'overall'),
+          ),
+          sessionKey: _nullableString(row['session_key']),
+          teacherId: _nullableString(row['teacher_id']),
+          teacherName: _nullableString(row['teacher_name']),
+          examDate: _nullableDateTime(row['exam_date']),
+          uploadedAt: _nullableDateTime(row['uploaded_at']),
+        );
+      })
+      .toList(growable: false);
 }
 
 List<ScorePoint> _scorePointsFromPayload(
@@ -1095,13 +1107,15 @@ List<ScorePoint> _scorePointsFromPayload(
   List<double> fallbackValues = const <double>[],
 }) {
   if (value is List) {
-    return value.map((dynamic item) {
-      final Map<String, dynamic> row = _mapValue(item);
-      return ScorePoint(
-        label: _stringValue(row, 'label'),
-        value: _doubleValue(row, 'value'),
-      );
-    }).toList(growable: false);
+    return value
+        .map((dynamic item) {
+          final Map<String, dynamic> row = _mapValue(item);
+          return ScorePoint(
+            label: _stringValue(row, 'label'),
+            value: _doubleValue(row, 'value'),
+          );
+        })
+        .toList(growable: false);
   }
 
   if (fallbackValues.isEmpty) {
@@ -1130,18 +1144,22 @@ List<SubjectResult> _subjectResultsFromScores(
       ? subjects
       : scores.keys.map((Object key) => key.toString()).toList(growable: false);
 
-  return sourceSubjects.map((String subject) {
-    final double score = (scores[subject] as num?)?.toDouble() ?? 0;
-    final NectaOLevelGrade grade = NectaOLevelCalculator.gradeForScore(score);
-    return SubjectResult(
-      subject: subject,
-      examMarks: const <ExamMark>[],
-      averageScore: score,
-      grade: grade.letter,
-      gradePoint: grade.point,
-      isCoreSubject: true,
-    );
-  }).toList(growable: false);
+  return sourceSubjects
+      .map((String subject) {
+        final double score = (scores[subject] as num?)?.toDouble() ?? 0;
+        final NectaOLevelGrade grade = NectaOLevelCalculator.gradeForScore(
+          score,
+        );
+        return SubjectResult(
+          subject: subject,
+          examMarks: const <ExamMark>[],
+          averageScore: score,
+          grade: grade.letter,
+          gradePoint: grade.point,
+          isCoreSubject: true,
+        );
+      })
+      .toList(growable: false);
 }
 
 String _gradeLevelForClass(String className) {
@@ -1213,6 +1231,16 @@ RiskLevel _riskLevelFromString(String value) {
   }
 }
 
+StudentGender _studentGenderFromString(String value) {
+  switch (value.trim().toLowerCase()) {
+    case 'male':
+    case 'm':
+      return StudentGender.male;
+    default:
+      return StudentGender.female;
+  }
+}
+
 Map<String, dynamic> _asMap(dynamic value) {
   if (value is Map<String, dynamic>) {
     return value;
@@ -1261,11 +1289,7 @@ double _doubleValue(
   return fallback;
 }
 
-int _intValue(
-  Map<String, dynamic> map,
-  String key, {
-  int fallback = 0,
-}) {
+int _intValue(Map<String, dynamic> map, String key, {int fallback = 0}) {
   final dynamic value = map[key];
   if (value is num) {
     return value.toInt();
@@ -1273,11 +1297,7 @@ int _intValue(
   return fallback;
 }
 
-bool _boolValue(
-  Map<String, dynamic> map,
-  String key, {
-  bool fallback = false,
-}) {
+bool _boolValue(Map<String, dynamic> map, String key, {bool fallback = false}) {
   final dynamic value = map[key];
   if (value is bool) {
     return value;

@@ -633,6 +633,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
   Future<void> addStudent({
     required String studentName,
     required String className,
+    StudentGender gender = StudentGender.female,
     List<String> subjects = const <String>[],
     String? admissionNumber,
     double? attendanceRate,
@@ -649,6 +650,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
           : 'SVC-${nextIndex.toString().padLeft(3, '0')}',
       studentName: studentName,
       className: className,
+      gender: gender,
       attendanceRate:
           (attendanceRate ?? (90 + (nextIndex % 6).toDouble())).clamp(0, 100)
               as double,
@@ -734,6 +736,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
             admissionNumber: record.admissionNumber,
             studentName: record.studentName,
             className: record.className,
+            gender: record.gender,
             attendanceRate: record.attendanceRate,
             subjectResults: updatedSubjects,
             performanceTrend: updatedTrend,
@@ -1315,6 +1318,7 @@ StudentResultRecord _composeStudentRecord({
   required String admissionNumber,
   required String studentName,
   required String className,
+  StudentGender gender = StudentGender.female,
   required double attendanceRate,
   required List<SubjectResult> subjectResults,
   required List<ScorePoint> performanceTrend,
@@ -1333,6 +1337,7 @@ StudentResultRecord _composeStudentRecord({
     admissionNumber: admissionNumber,
     studentName: studentName,
     className: className,
+    gender: gender,
     averageScore: averageScore,
     interExamAverage: interExamAverage,
     division: divisionSummary.division,
@@ -1353,6 +1358,7 @@ StudentResultRecord _recomposeRecord(
     admissionNumber: record.admissionNumber,
     studentName: record.studentName,
     className: record.className,
+    gender: record.gender,
     attendanceRate: record.attendanceRate,
     subjectResults: subjectResults,
     performanceTrend: <ScorePoint>[

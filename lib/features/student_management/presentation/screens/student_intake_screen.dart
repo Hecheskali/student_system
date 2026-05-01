@@ -56,7 +56,7 @@ class _StudentIntakeScreenState extends ConsumerState<StudentIntakeScreen> {
         adminState.studentResults
             .where((record) => record.className == _selectedClass)
             .toList()
-          ..sort((a, b) => a.studentName.compareTo(b.studentName));
+          ..sort(compareStudentResultsForRoster);
 
     final Set<String> subjectsInClass = classStudents
         .expand((student) => student.subjectResults)
@@ -300,6 +300,7 @@ class _AddStudentFormState extends ConsumerState<_AddStudentForm> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   final Set<String> _selectedSubjects = <String>{};
+  StudentGender _gender = StudentGender.female;
 
   @override
   void initState() {
@@ -350,6 +351,26 @@ class _AddStudentFormState extends ConsumerState<_AddStudentForm> {
                   prefixIcon: Icon(Icons.person_rounded),
                 ),
                 validator: FormValidators.validateStudentFullName,
+              ),
+              const SizedBox(height: 18),
+              DropdownButtonFormField<StudentGender>(
+                initialValue: _gender,
+                decoration: const InputDecoration(
+                  labelText: 'Gender',
+                  prefixIcon: Icon(Icons.wc_rounded),
+                ),
+                items: StudentGender.values.map((StudentGender gender) {
+                  return DropdownMenuItem<StudentGender>(
+                    value: gender,
+                    child: Text(gender.label),
+                  );
+                }).toList(),
+                onChanged: (StudentGender? value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() => _gender = value);
+                },
               ),
               const SizedBox(height: 18),
               Text(
@@ -417,6 +438,7 @@ class _AddStudentFormState extends ConsumerState<_AddStudentForm> {
           .addStudent(
             studentName: formattedName,
             className: widget.selectedClass,
+            gender: _gender,
             subjects: _selectedSubjects.toList(growable: false),
           );
     } on Object catch (error) {
@@ -592,7 +614,7 @@ class _ProfessionalTable extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      student.admissionNumber,
+                      '${student.gender.label} • ${student.admissionNumber}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: const Color(0xFF64748B),
                       ),

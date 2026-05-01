@@ -474,7 +474,7 @@ List<StudentMasterRecord> _seedStudentRegistry(
       className: result.className,
       guardianName: '',
       guardianPhone: '',
-      gender: StudentGender.female,
+      gender: result.gender,
       dateOfBirth: DateTime(2009, 1, 1),
       admissionDate: DateTime.now(),
       status: StudentStatus.active,
@@ -570,7 +570,7 @@ List<StudentMasterRecord> _mergeRegistryFromHistoricalRecords({
       className: record.className,
       guardianName: 'Imported guardian',
       guardianPhone: 'Pending update',
-      gender: StudentGender.female,
+      gender: record.result.gender,
       dateOfBirth: DateTime(2009, 1, 1),
       admissionDate: DateTime.now(),
       status: StudentStatus.active,
@@ -584,11 +584,42 @@ List<StudentMasterRecord> _mergeRegistryFromHistoricalRecords({
     );
   }
 
-  return merged.values.toList()..sort(
-    (StudentMasterRecord a, StudentMasterRecord b) =>
-        a.fullName.compareTo(b.fullName),
-  );
+  return merged.values.toList()..sort(_compareStudentRegistryForRoster);
 }
+
+int _compareStudentRegistryForRoster(
+  StudentMasterRecord first,
+  StudentMasterRecord second,
+) {
+  final int genderCompare = _registryGenderSortValue(
+    first.gender,
+  ).compareTo(_registryGenderSortValue(second.gender));
+  if (genderCompare != 0) {
+    return genderCompare;
+  }
+
+  final int nameCompare = _registrySortKey(
+    first.fullName,
+  ).compareTo(_registrySortKey(second.fullName));
+  if (nameCompare != 0) {
+    return nameCompare;
+  }
+
+  return _registrySortKey(
+    first.admissionNumber,
+  ).compareTo(_registrySortKey(second.admissionNumber));
+}
+
+int _registryGenderSortValue(StudentGender gender) {
+  switch (gender) {
+    case StudentGender.female:
+      return 0;
+    case StudentGender.male:
+      return 1;
+  }
+}
+
+String _registrySortKey(String value) => value.trim().toUpperCase();
 
 double _average(Iterable<double> values) {
   final List<double> list = values.toList();
