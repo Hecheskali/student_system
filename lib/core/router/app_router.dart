@@ -6,10 +6,10 @@ import '../../features/student_management/presentation/screens/all_results_scree
 import '../../features/student_management/presentation/screens/dashboard_screen.dart';
 import '../../features/student_management/presentation/screens/hierarchy_explorer_screen.dart';
 import '../../features/student_management/presentation/screens/login_screen.dart';
+import '../../features/student_management/presentation/screens/management_screen.dart';
 import '../../features/student_management/presentation/screens/profiles_screen.dart';
 import '../../features/student_management/presentation/screens/records_screen.dart';
 import '../../features/student_management/presentation/screens/result_detail_screen.dart';
-import '../../features/student_management/presentation/screens/result_entry_professional_screen.dart';
 import '../../features/student_management/presentation/screens/result_entry_screen.dart';
 import '../../features/student_management/presentation/screens/results_screen.dart';
 import '../../features/student_management/presentation/screens/search_screen.dart';
@@ -50,8 +50,8 @@ class AppRouter {
       ),
       GoRoute(
         path: '/manage',
-        builder: (context, state) => ResultEntryProfessionalScreen(
-          initialClass: state.uri.queryParameters['class'],
+        builder: (context, state) => ManagementScreen(
+          initialTab: state.uri.queryParameters['tab'] ?? 'students',
         ),
       ),
       GoRoute(
