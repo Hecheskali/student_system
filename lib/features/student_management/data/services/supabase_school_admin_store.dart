@@ -341,12 +341,12 @@ class SupabaseSchoolAdminStore {
         .from('students')
         .select()
         .order('class_name')
-        .order('gender')
         .order('full_name');
     final List<dynamic> rows = List<dynamic>.from(response as List);
     return rows
         .map((dynamic row) => _studentRecordFromRow(_asMap(row)))
-        .toList(growable: false);
+        .toList(growable: false)
+      ..sort(_comparePersistedStudentsForRoster);
   }
 
   Future<StudentResultRecord> saveStudentRecord({
@@ -388,13 +388,10 @@ class SupabaseSchoolAdminStore {
       'student_profile': _studentProfilePayload(record),
     };
 
-    final dynamic saved = _looksLikeUuid(record.id)
-        ? await _client
-              .from('students')
-              .upsert(payload, onConflict: 'id')
-              .select()
-              .single()
-        : await _client.from('students').insert(payload).select().single();
+    final dynamic saved = await _writeStudentPayload(
+      record: record,
+      payload: payload,
+    );
 
     final StudentResultRecord savedRecord = record.copyWith(
       id: _stringValue(_asMap(saved), 'id', fallback: record.id),
@@ -406,6 +403,45 @@ class SupabaseSchoolAdminStore {
     );
 
     return savedRecord;
+  }
+
+  Future<dynamic> _writeStudentPayload({
+    required StudentResultRecord record,
+    required Map<String, dynamic> payload,
+  }) async {
+    try {
+      return await _writeStudentPayloadOnce(record: record, payload: payload);
+    } on PostgrestException catch (error) {
+      if (!_isMissingStudentGenderColumnError(error)) {
+        rethrow;
+      }
+
+      final Map<String, dynamic> fallbackPayload = <String, dynamic>{...payload}
+        ..remove('gender');
+      final Map<String, dynamic> profile = _mapValue(
+        fallbackPayload['student_profile'],
+      );
+      fallbackPayload['student_profile'] = <String, dynamic>{
+        ...profile,
+        'gender': record.gender.name,
+      };
+
+      return _writeStudentPayloadOnce(record: record, payload: fallbackPayload);
+    }
+  }
+
+  Future<dynamic> _writeStudentPayloadOnce({
+    required StudentResultRecord record,
+    required Map<String, dynamic> payload,
+  }) {
+    if (_looksLikeUuid(record.id)) {
+      return _client
+          .from('students')
+          .upsert(payload, onConflict: 'id')
+          .select()
+          .single();
+    }
+    return _client.from('students').insert(payload).select().single();
   }
 
   Future<void> saveStudentRecords({
@@ -1239,6 +1275,28 @@ StudentGender _studentGenderFromString(String value) {
     default:
       return StudentGender.female;
   }
+}
+
+int _comparePersistedStudentsForRoster(
+  StudentResultRecord first,
+  StudentResultRecord second,
+) {
+  final int classCompare = _sortKey(
+    first.className,
+  ).compareTo(_sortKey(second.className));
+  if (classCompare != 0) {
+    return classCompare;
+  }
+  return compareStudentResultsForRoster(first, second);
+}
+
+String _sortKey(String value) => value.trim().toUpperCase();
+
+bool _isMissingStudentGenderColumnError(PostgrestException error) {
+  final String message = error.message.toLowerCase();
+  return error.code == 'PGRST204' &&
+      message.contains('gender') &&
+      message.contains('students');
 }
 
 Map<String, dynamic> _asMap(dynamic value) {

@@ -342,17 +342,6 @@ class _AddStudentFormState extends ConsumerState<_AddStudentForm> {
                 ),
               ),
               const SizedBox(height: 18),
-              TextFormField(
-                controller: _nameController,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  labelText: 'Student Full Name',
-                  hintText: 'e.g. JOHN PAUL SMITH (3+ names, CAPITALS)',
-                  prefixIcon: Icon(Icons.person_rounded),
-                ),
-                validator: FormValidators.validateStudentFullName,
-              ),
-              const SizedBox(height: 18),
               DropdownButtonFormField<StudentGender>(
                 initialValue: _gender,
                 decoration: const InputDecoration(
@@ -371,6 +360,17 @@ class _AddStudentFormState extends ConsumerState<_AddStudentForm> {
                   }
                   setState(() => _gender = value);
                 },
+              ),
+              const SizedBox(height: 18),
+              TextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Student Full Name',
+                  hintText: 'e.g. JOHN PAUL SMITH (3+ names, CAPITALS)',
+                  prefixIcon: Icon(Icons.person_rounded),
+                ),
+                validator: FormValidators.validateStudentFullName,
               ),
               const SizedBox(height: 18),
               Text(

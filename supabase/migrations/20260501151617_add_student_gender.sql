@@ -40,3 +40,5 @@ $$;
 
 create index if not exists students_class_gender_name_idx
 on public.students(class_name, gender, full_name);
+
+notify pgrst, 'reload schema';
