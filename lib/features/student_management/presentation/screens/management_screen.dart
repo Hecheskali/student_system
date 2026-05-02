@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,31 @@ import '../utils/exam_mark_reporting.dart';
 import '../utils/form_validators.dart';
 import '../widgets/motion_widgets.dart';
 import '../widgets/workspace_shell.dart';
+
+/// Centralised ID generation to avoid collisions in exam marks.
+String generateExamMarkId(String prefix) {
+  final now = DateTime.now();
+  final micro = now.microsecondsSinceEpoch;
+  final random = Random().nextInt(9999);
+  return '$prefix-$micro-$random';
+}
+
+// ---------------------------------------------------------------------------
+// Shared UI constants (hard‑coded strings extracted to promote future i18n)
+// ---------------------------------------------------------------------------
+abstract class ManagementStrings {
+  static const String selectRowHint = 'Select row';
+  static const String unavailableText = 'Unavailable';
+  static const String noStudentsMessage =
+      'No students found in this class yet.';
+  static const String noStudentsForSubject =
+      'No registered students for this subject';
+  static const String studentNotAssignedToSubject = 'Subject not assigned';
+  static const String noScoreUploaded = 'No score uploaded';
+  static const String selectOrCreateHint =
+      'Select or create a student to continue.';
+  // … add more if desired
+}
 
 class ManagementScreen extends StatelessWidget {
   const ManagementScreen({super.key, this.initialTab = 'upload'});
@@ -45,163 +72,9 @@ class ManagementScreen extends StatelessWidget {
   }
 }
 
-// ignore: unused_element
-class _ManagementView extends ConsumerWidget {
-  const _ManagementView({required this.initialTab});
-
-  final String initialTab;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final SchoolAdminState adminState = ref.watch(schoolAdminProvider);
-    final SchoolOverview overview = ref.watch(schoolOverviewProvider);
-    final TeacherAccount? teacher = ref.watch(currentTeacherProvider);
-    final SessionUser? session = adminState.session;
-
-    if (session == null) {
-      return Scaffold(
-        body: Center(
-          child: FilledButton(
-            onPressed: () => context.go('/login'),
-            child: const Text('Login to manage students'),
-          ),
-        ),
-      );
-    }
-
-    return WorkspaceShell(
-      currentSection: WorkspaceSection.operations,
-      session: session,
-      title: 'Student Management',
-      subtitle:
-          'Use a class-first workflow to add students and enter subject results without popups or comma-separated score fields.',
-      actions: <Widget>[
-        FilledButton.icon(
-          onPressed: () => context.go('/results'),
-          icon: const Icon(Icons.table_view_rounded),
-          label: const Text('Open Results Table'),
-        ),
-        FilledButton.tonalIcon(
-          onPressed: () => context.go('/records'),
-          icon: const Icon(Icons.history_edu_rounded),
-          label: const Text('Records'),
-        ),
-        FilledButton.tonalIcon(
-          onPressed: () => context.go('/profiles'),
-          icon: const Icon(Icons.perm_media_rounded),
-          label: const Text('Profiles'),
-        ),
-        FilledButton.tonalIcon(
-          onPressed: () => context.go('/manage?tab=students'),
-          icon: const Icon(Icons.person_add_alt_1_rounded),
-          label: const Text('Students'),
-        ),
-        FilledButton.tonalIcon(
-          onPressed: () => context.go('/manage?tab=results'),
-          icon: const Icon(Icons.edit_note_rounded),
-          label: const Text('Results'),
-        ),
-      ],
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          final bool compactViewport =
-              constraints.maxHeight < 820 || constraints.maxWidth < 960;
-          final bool veryCompact =
-              constraints.maxHeight < 720 || constraints.maxWidth < 760;
-          final double gap = compactViewport ? 12 : 18;
-          final double horizontalPadding = compactViewport ? 16 : 20;
-          final double bottomPadding = compactViewport ? 18 : 24;
-          final double shellRadius = compactViewport ? 24 : 28;
-
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              compactViewport ? 4 : 8,
-              horizontalPadding,
-              bottomPadding,
-            ),
-            child: Column(
-              children: <Widget>[
-                RevealMotion(
-                  child: _ManagementHero(
-                    overview: overview,
-                    session: session,
-                    teacher: teacher,
-                    compact: compactViewport,
-                  ),
-                ),
-                SizedBox(height: gap),
-                Expanded(
-                  child: RevealMotion(
-                    delay: const Duration(milliseconds: 90),
-                    child: HoverLift(
-                      borderRadius: BorderRadius.circular(shellRadius),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(shellRadius),
-                          border: Border.all(color: const Color(0xFFE7EBF3)),
-                        ),
-                        child: Column(
-                          children: <Widget>[
-                            Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                compactViewport ? 16 : 20,
-                                compactViewport ? 14 : 18,
-                                compactViewport ? 16 : 20,
-                                0,
-                              ),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: TabBar(
-                                  isScrollable: true,
-                                  dividerColor: Colors.transparent,
-                                  labelColor: Colors.white,
-                                  unselectedLabelColor: const Color(0xFF475569),
-                                  labelPadding: EdgeInsets.symmetric(
-                                    horizontal: compactViewport ? 10 : 16,
-                                  ),
-                                  indicator: BoxDecoration(
-                                    color: const Color(0xFF155EEF),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  indicatorPadding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  tabs: const <Widget>[
-                                    Tab(text: 'Add Students'),
-                                    Tab(text: 'Update Results'),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: veryCompact ? 8 : 12),
-                            Expanded(
-                              child: TabBarView(
-                                children: <Widget>[
-                                  AddStudentWorkspace(overview: overview),
-                                  ResultEntryWorkspace(
-                                    overview: overview,
-                                    session: session,
-                                    teacher: teacher,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
+// ============================================================================
+// ADD STUDENT WORKSPACE
+// ============================================================================
 
 class AddStudentWorkspace extends ConsumerStatefulWidget {
   const AddStudentWorkspace({super.key, required this.overview});
@@ -294,9 +167,6 @@ class _AddStudentWorkspaceState extends ConsumerState<AddStudentWorkspace> {
                                 'Names must be in CAPITAL LETTERS with at least 3 parts',
                           ),
                           validator: FormValidators.validateStudentFullName,
-                          onChanged: (value) {
-                            // Optional: auto-format to uppercase as user types
-                          },
                         ),
                         const SizedBox(height: 14),
                         Container(
@@ -393,11 +263,8 @@ class _AddStudentWorkspaceState extends ConsumerState<AddStudentWorkspace> {
   }
 
   void _saveStudent() {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    // Format student name to proper uppercase
     final String formattedName = FormValidators.formatStudentName(
       _nameController.text.trim(),
     );
@@ -416,6 +283,10 @@ class _AddStudentWorkspaceState extends ConsumerState<AddStudentWorkspace> {
     );
   }
 }
+
+// ============================================================================
+// RESULT ENTRY WORKSPACE (Headmaster / Academic Master)
+// ============================================================================
 
 class ResultEntryWorkspace extends ConsumerStatefulWidget {
   const ResultEntryWorkspace({
@@ -489,9 +360,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
     if (effectiveStudentId != _selectedStudentId &&
         effectiveStudentId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
         setState(() {
           _selectedStudentId = effectiveStudentId;
           _subjectIndex = 0;
@@ -556,7 +425,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
                   subtitle:
                       'The selected class drives the rest of the workflow so staff do not enter results against the wrong group.',
                   child: students.isEmpty
-                      ? const Text('No students found in this class yet.')
+                      ? const Text(ManagementStrings.noStudentsMessage)
                       : Column(
                           children: students.map((StudentResultRecord student) {
                             final bool active =
@@ -588,7 +457,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
                   subtitle:
                       'Each mark is saved with an exam type and label so reports can later filter by mid-term, annual, class exam, or teacher-named exams.',
                   child: record == null
-                      ? const Text('Select or create a student to continue.')
+                      ? const Text(ManagementStrings.selectOrCreateHint)
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
@@ -596,9 +465,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
                               subjects: _subjects,
                               currentIndex: _subjectIndex,
                               onSubjectSelected: (int index) {
-                                setState(() {
-                                  _subjectIndex = index;
-                                });
+                                setState(() => _subjectIndex = index);
                                 _loadCurrentSubjectFields(
                                   ref.read(schoolAdminProvider).studentResults,
                                 );
@@ -638,9 +505,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
                                       _subjectIndex >= _subjects.length - 1
                                       ? null
                                       : () {
-                                          setState(() {
-                                            _subjectIndex += 1;
-                                          });
+                                          setState(() => _subjectIndex += 1);
                                           _loadCurrentSubjectFields(
                                             ref
                                                 .read(schoolAdminProvider)
@@ -730,9 +595,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
   }
 
   void _removeExamField(int index) {
-    if (_examRows.length <= 1) {
-      return;
-    }
+    if (_examRows.length <= 1) return;
     setState(() {
       final _ExamDraftController controller = _examRows.removeAt(index);
       controller.dispose();
@@ -741,9 +604,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
 
   void _saveCurrentSubject() {
     final String? studentId = _selectedStudentId;
-    if (studentId == null) {
-      return;
-    }
+    if (studentId == null) return;
 
     final String currentSubject = _subjects[_subjectIndex];
     final bool isScience = FormValidators.isScienceSubject(currentSubject);
@@ -754,7 +615,6 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
       final double? score = double.tryParse(row.scoreController.text.trim());
       final String label = row.labelController.text.trim();
 
-      // Validate label
       final String? labelError = FormValidators.validateExamLabel(label);
       if (labelError != null) {
         ScaffoldMessenger.of(
@@ -763,7 +623,6 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
         return;
       }
 
-      // Validate score
       if (score == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Enter a valid number for each mark')),
@@ -771,7 +630,6 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
         return;
       }
 
-      // Validate mark ranges based on subject type and component
       if (isScience) {
         if (row.component == ExamComponent.theory) {
           final String? error = FormValidators.validateTheoryMarks(
@@ -818,7 +676,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
 
       examMarks.add(
         ExamMark(
-          id: 'manual-$currentSubject-$index',
+          id: generateExamMarkId('manual-$currentSubject'),
           label: label,
           type: row.type,
           score: score,
@@ -855,13 +713,8 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
 
   void _saveAndNext() {
     _saveCurrentSubject();
-    if (_subjectIndex >= _subjects.length - 1) {
-      return;
-    }
-
-    setState(() {
-      _subjectIndex += 1;
-    });
+    if (_subjectIndex >= _subjects.length - 1) return;
+    setState(() => _subjectIndex += 1);
     _loadCurrentSubjectFields(ref.read(schoolAdminProvider).studentResults);
   }
 
@@ -880,9 +733,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
     String studentId,
   ) {
     for (final StudentResultRecord record in allResults) {
-      if (record.id == studentId) {
-        return record;
-      }
+      if (record.id == studentId) return record;
     }
     return null;
   }
@@ -895,9 +746,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
         )
         .whereType<double>()
         .toList();
-    if (exams.isEmpty) {
-      return 0;
-    }
+    if (exams.isEmpty) return 0;
     return double.parse(
       (exams.fold<double>(0, (double sum, double item) => sum + item) /
               exams.length)
@@ -905,9 +754,8 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
     );
   }
 
-  String get _previewGrade {
-    return NectaOLevelCalculator.gradeForScore(_previewAverage).letter;
-  }
+  String get _previewGrade =>
+      NectaOLevelCalculator.gradeForScore(_previewAverage).letter;
 
   ExamMark _blankExamMark(int index, ExamType type) {
     final int order = _examRows.where((row) => row.type == type).length + 1;
@@ -918,7 +766,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
       ExamType.teacherNamed => 'Teacher Exam $order',
     };
     return ExamMark(
-      id: 'blank-${type.name}-$index',
+      id: generateExamMarkId('blank-${type.name}'),
       label: label,
       type: type,
       score: 0,
@@ -928,129 +776,9 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
   }
 }
 
-class _ManagementHero extends StatelessWidget {
-  const _ManagementHero({
-    required this.overview,
-    required this.session,
-    required this.teacher,
-    this.compact = false,
-  });
-
-  final SchoolOverview overview;
-  final SessionUser session;
-  final TeacherAccount? teacher;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(compact ? 20 : 24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        gradient: const LinearGradient(
-          colors: <Color>[
-            Color(0xFF0F172A),
-            Color(0xFF0D3B66),
-            Color(0xFF0F766E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          final bool stacked = compact || constraints.maxWidth < 980;
-          final Widget leftContent = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              _SummaryPill(
-                label: session.role == UserRole.headOfSchool
-                    ? 'Headmaster workflow'
-                    : 'Teacher workflow',
-                tone: Colors.white.withValues(alpha: 0.14),
-                textColor: Colors.white,
-              ),
-              SizedBox(height: compact ? 12 : 16),
-              Text(
-                'Class-first management replaces the old popup flow.',
-                style:
-                    (compact
-                            ? Theme.of(context).textTheme.titleLarge
-                            : Theme.of(context).textTheme.headlineSmall)
-                        ?.copyWith(color: Colors.white),
-              ),
-              SizedBox(height: compact ? 8 : 10),
-              Text(
-                session.role == UserRole.headOfSchool
-                    ? (compact
-                          ? 'Move across forms, add students in context, and review results without leaving the page.'
-                          : 'Move across Form 1 to Form 4, add students in context, and review each subject result section without leaving the page.')
-                    : (compact
-                          ? 'Work from your assigned class with boxed score entry and a direct path into the result sheet.'
-                          : 'Work from your assigned class and subject with structured score boxes, exam-by-exam rows, and a direct path into the final result sheet.'),
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.84),
-                ),
-              ),
-            ],
-          );
-          final Widget rightContent = Container(
-            padding: EdgeInsets.all(compact ? 14 : 18),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Current context',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleMedium?.copyWith(color: Colors.white),
-                ),
-                SizedBox(height: compact ? 10 : 12),
-                _HeroInfo(label: 'School', value: overview.schoolName),
-                SizedBox(height: compact ? 6 : 8),
-                _HeroInfo(label: 'Classes ready', value: 'Form 1 to Form 4'),
-                SizedBox(height: compact ? 6 : 8),
-                _HeroInfo(
-                  label: session.role == UserRole.teacher
-                      ? 'Assigned class'
-                      : 'Total students',
-                  value: session.role == UserRole.teacher
-                      ? (teacher?.assignedClass ?? 'Not set')
-                      : '${overview.totalStudents}',
-                ),
-              ],
-            ),
-          );
-
-          if (stacked) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                leftContent,
-                SizedBox(height: compact ? 12 : 16),
-                rightContent,
-              ],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Expanded(flex: 6, child: leftContent),
-              const SizedBox(width: 18),
-              Expanded(flex: 4, child: rightContent),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
+// ============================================================================
+// COMMON UI COMPONENTS
+// ============================================================================
 
 class _SectionIntro extends StatelessWidget {
   const _SectionIntro({required this.title, required this.subtitle});
@@ -1428,9 +1156,7 @@ class _SubjectEntryBox extends StatelessWidget {
                                       );
                                     }).toList(),
                                     onChanged: (ExamType? value) {
-                                      if (value == null) {
-                                        return;
-                                      }
+                                      if (value == null) return;
                                       entry.value.type = value;
                                     },
                                   ),
@@ -1483,9 +1209,7 @@ class _SubjectEntryBox extends StatelessWidget {
                                         );
                                       }).toList(),
                                       onChanged: (ExamType? value) {
-                                        if (value == null) {
-                                          return;
-                                        }
+                                        if (value == null) return;
                                         entry.value.type = value;
                                       },
                                     ),
@@ -1733,65 +1457,9 @@ class _SummaryPill extends StatelessWidget {
   }
 }
 
-class _HeroInfo extends StatelessWidget {
-  const _HeroInfo({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.82),
-            ),
-          ),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(color: Colors.white),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-@immutable
-class ClassCluster {
-  const ClassCluster({required this.formLabel, required this.classNames});
-
-  final String formLabel;
-  final List<String> classNames;
-}
-
-const List<ClassCluster> kClassCatalog = <ClassCluster>[
-  ClassCluster(
-    formLabel: 'Form 1',
-    classNames: <String>['Form 1 A', 'Form 1 B'],
-  ),
-  ClassCluster(
-    formLabel: 'Form 2',
-    classNames: <String>['Form 2 A', 'Form 2 B'],
-  ),
-  ClassCluster(
-    formLabel: 'Form 3',
-    classNames: <String>['Form 3 A', 'Form 3 B'],
-  ),
-  ClassCluster(
-    formLabel: 'Form 4',
-    classNames: <String>['Form 4 A', 'Form 4 B'],
-  ),
-];
+// ============================================================================
+// ROLE‑BASED MANAGEMENT SCREENS
+// ============================================================================
 
 class HeadmasterManagementScreen extends ConsumerWidget {
   const HeadmasterManagementScreen({super.key, this.initialTab = 'upload'});
@@ -1803,7 +1471,7 @@ class HeadmasterManagementScreen extends ConsumerWidget {
     return _LeadershipManagementScreen(
       title: 'Headmaster Operations',
       subtitle:
-          'Register teachers, assign one or two subjects, manage school-wide permissions, and keep student intake moving.',
+          'Register teachers, assign one or two subjects, manage school‑wide permissions, and keep student intake moving.',
       canRemoveTeachers: true,
       initialTab: initialTab,
     );
@@ -1847,7 +1515,7 @@ class TeacherManagementScreen extends ConsumerWidget {
         session: session,
         title: 'Teacher Workspace',
         subtitle:
-            'Register students, fill subject-isolated score sheets in rows and columns, and review the combined class result before export.',
+            'Register students, fill subject‑isolated score sheets in rows and columns, and review the combined class result before export.',
         actions: <Widget>[
           FilledButton.icon(
             onPressed: () => context.go('/result-entry'),
@@ -1883,7 +1551,7 @@ class TeacherManagementScreen extends ConsumerWidget {
                   'Classes: ${overview.totalClasses}',
                   'Upload ${teacher?.canUploadResults ?? false ? 'Enabled' : 'Locked'}',
                   adminState.settings.autoZeroMissingPracticals
-                      ? 'Missing practicals auto-fill 0'
+                      ? 'Missing practicals auto‑fill 0'
                       : 'Manual practical entry',
                 ],
               ),
@@ -2065,6 +1733,9 @@ class _LeadershipManagementScreen extends ConsumerWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Tab index helpers
+// ---------------------------------------------------------------------------
 int _leadershipInitialTabIndex(String value) {
   switch (value.toLowerCase()) {
     case 'teacher':
@@ -2103,6 +1774,10 @@ int _teacherInitialTabIndex(String value) {
       return 0;
   }
 }
+
+// ============================================================================
+// LEADERSHIP RESULT UPLOAD WORKSPACE
+// ============================================================================
 
 class _LeadershipResultUploadWorkspace extends ConsumerStatefulWidget {
   const _LeadershipResultUploadWorkspace({required this.session});
@@ -2166,9 +1841,7 @@ class _LeadershipResultUploadWorkspaceState
         : classNames.first;
     if (effectiveClass != _selectedClass) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
         setState(() {
           _selectedClass = effectiveClass;
           _selectedStudentId = null;
@@ -2191,9 +1864,7 @@ class _LeadershipResultUploadWorkspaceState
         : subjectNames.first;
     if (effectiveSubject != _selectedSubject) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
         setState(() {
           _selectedSubject = effectiveSubject;
           _scoreController.clear();
@@ -2205,9 +1876,7 @@ class _LeadershipResultUploadWorkspaceState
     final List<StudentResultRecord> visibleStudents = classStudents.where((
       StudentResultRecord record,
     ) {
-      if (query.isEmpty) {
-        return true;
-      }
+      if (query.isEmpty) return true;
       return record.studentName.toLowerCase().contains(query) ||
           record.admissionNumber.toLowerCase().contains(query) ||
           record.className.toLowerCase().contains(query);
@@ -2220,9 +1889,7 @@ class _LeadershipResultUploadWorkspaceState
         );
     if (!selectedStillVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
         setState(() {
           _selectedStudentId = null;
           _scoreController.clear();
@@ -2230,8 +1897,8 @@ class _LeadershipResultUploadWorkspaceState
       });
     }
 
-    final int uploadedRows = classStudents.where((StudentResultRecord record) {
-      final SubjectResult? result = _subjectResultFor(record, effectiveSubject);
+    final int uploadedRows = classStudents.where((record) {
+      final result = _subjectResultFor(record, effectiveSubject);
       return result != null && result.examMarks.isNotEmpty;
     }).length;
     final bool locked = state.resultWindow.editingLocked;
@@ -2295,16 +1962,14 @@ class _LeadershipResultUploadWorkspaceState
                       ),
                       items: subjectNames
                           .map(
-                            (String subject) => DropdownMenuItem<String>(
-                              value: subject,
-                              child: Text(subject),
+                            (String s) => DropdownMenuItem<String>(
+                              value: s,
+                              child: Text(s),
                             ),
                           )
                           .toList(),
                       onChanged: (String? value) {
-                        if (value == null) {
-                          return;
-                        }
+                        if (value == null) return;
                         setState(() {
                           _selectedSubject = value;
                           _scoreController.clear();
@@ -2329,9 +1994,7 @@ class _LeadershipResultUploadWorkspaceState
                           )
                           .toList(),
                       onChanged: (ExamType? value) {
-                        if (value == null) {
-                          return;
-                        }
+                        if (value == null) return;
                         setState(() {
                           _examType = value;
                           _examLabelController.text = _defaultExamLabel;
@@ -2459,7 +2122,9 @@ class _LeadershipResultUploadWorkspaceState
           subject: subjectResult.subject,
           examMarks: <ExamMark>[
             ExamMark(
-              id: 'leadership-${record.id}-${subjectResult.subject}-${now.microsecondsSinceEpoch}',
+              id: generateExamMarkId(
+                'leadership-${record.id}-${subjectResult.subject}',
+              ),
               label: label,
               type: _examType,
               score: score,
@@ -2487,60 +2152,57 @@ class _LeadershipResultUploadWorkspaceState
 
   static List<String> _availableClassNames(List<StudentResultRecord> records) {
     final Set<String> registeredClasses = records
-        .map((StudentResultRecord record) => record.className)
-        .where((String value) => value.trim().isNotEmpty)
+        .map((r) => r.className)
+        .where((v) => v.trim().isNotEmpty)
         .toSet();
     final List<String> catalogClasses = kClassCatalog
-        .expand((ClassCluster cluster) => cluster.classNames)
+        .expand((c) => c.classNames)
         .toList(growable: false);
-    final List<String> ordered = <String>[
-      for (final String className in catalogClasses)
+    final List<String> ordered = [
+      for (final className in catalogClasses)
         if (registeredClasses.isEmpty || registeredClasses.contains(className))
           className,
     ];
     final List<String> extras =
-        registeredClasses
-            .where((String value) => !catalogClasses.contains(value))
-            .toList()
+        registeredClasses.where((v) => !catalogClasses.contains(v)).toList()
           ..sort();
-    return <String>[...ordered, ...extras];
+    return [...ordered, ...extras];
   }
 
   static List<String> _availableSubjects(List<StudentResultRecord> records) {
-    final Set<String> registeredSubjects = <String>{
-      for (final StudentResultRecord record in records)
-        for (final SubjectResult result in record.subjectResults)
+    final Set<String> registeredSubjects = {
+      for (final record in records)
+        for (final result in record.subjectResults)
           if (result.subject.trim().isNotEmpty) result.subject,
     };
-    if (registeredSubjects.isEmpty) {
-      return kNectaOLevelDefaultSubjectNames;
-    }
+    if (registeredSubjects.isEmpty) return kNectaOLevelDefaultSubjectNames;
 
-    final List<String> ordered = <String>[
-      for (final String subject in kNectaOLevelSubjectNames)
+    final List<String> ordered = [
+      for (final subject in kNectaOLevelSubjectNames)
         if (registeredSubjects.contains(subject)) subject,
     ];
     final List<String> extras =
         registeredSubjects
-            .where((String value) => !kNectaOLevelSubjectNames.contains(value))
+            .where((v) => !kNectaOLevelSubjectNames.contains(v))
             .toList()
           ..sort();
-    return <String>[...ordered, ...extras];
+    return [...ordered, ...extras];
   }
 
   static SubjectResult? _subjectResultFor(
     StudentResultRecord record,
     String subject,
   ) {
-    for (final SubjectResult result in record.subjectResults) {
-      if (result.subject == subject) {
-        return result;
-      }
+    for (final result in record.subjectResults) {
+      if (result.subject == subject) return result;
     }
     return null;
   }
 }
 
+// ---------------------------------------------------------------------------
+// Leadership upload sheet (table inside the leadership workspace)
+// ---------------------------------------------------------------------------
 class _LeadershipUploadSheet extends StatelessWidget {
   const _LeadershipUploadSheet({
     required this.records,
@@ -2687,7 +2349,9 @@ class _LeadershipUploadSheet extends StatelessWidget {
                                 ),
                               )
                             : Text(
-                                result == null ? 'Unavailable' : 'Select row',
+                                result == null
+                                    ? ManagementStrings.unavailableText
+                                    : ManagementStrings.selectRowHint,
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                       ),
@@ -2716,10 +2380,8 @@ class _LeadershipUploadSheet extends StatelessWidget {
     StudentResultRecord record,
     String subject,
   ) {
-    for (final SubjectResult result in record.subjectResults) {
-      if (result.subject == subject) {
-        return result;
-      }
+    for (final result in record.subjectResults) {
+      if (result.subject == subject) return result;
     }
     return null;
   }
@@ -2766,7 +2428,7 @@ class _CurrentUploadResult extends StatelessWidget {
   Widget build(BuildContext context) {
     if (result == null) {
       return Text(
-        'Subject not assigned',
+        ManagementStrings.studentNotAssignedToSubject,
         style: Theme.of(
           context,
         ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF9A3412)),
@@ -2775,7 +2437,7 @@ class _CurrentUploadResult extends StatelessWidget {
 
     if (result!.examMarks.isEmpty) {
       return Text(
-        'No score uploaded',
+        ManagementStrings.noScoreUploaded,
         style: Theme.of(
           context,
         ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF475569)),
@@ -2804,17 +2466,19 @@ class _CurrentUploadResult extends StatelessWidget {
   }
 
   static ExamMark _latestMark(List<ExamMark> marks) {
-    final List<ExamMark> ordered = <ExamMark>[...marks]
-      ..sort((ExamMark first, ExamMark second) {
-        final DateTime firstDate =
-            first.uploadedAt ?? first.examDate ?? DateTime(2000);
-        final DateTime secondDate =
-            second.uploadedAt ?? second.examDate ?? DateTime(2000);
-        return secondDate.compareTo(firstDate);
+    final List<ExamMark> ordered = [...marks]
+      ..sort((a, b) {
+        final aDate = a.uploadedAt ?? a.examDate ?? DateTime(2000);
+        final bDate = b.uploadedAt ?? b.examDate ?? DateTime(2000);
+        return bDate.compareTo(aDate);
       });
     return ordered.first;
   }
 }
+
+// ============================================================================
+// TEACHER REGISTRY & RESULT CONTROLS
+// ============================================================================
 
 class _TeacherRegistryWorkspace extends ConsumerWidget {
   const _TeacherRegistryWorkspace({required this.canRemoveTeachers});
@@ -2850,14 +2514,14 @@ class _TeacherRegistryWorkspace extends ConsumerWidget {
                     runSpacing: 10,
                     children: <Widget>[
                       ...teacher.effectiveSubjects.map(
-                        (String item) => _SummaryPill(
-                          label: item,
+                        (s) => _SummaryPill(
+                          label: s,
                           tone: const Color(0xFFE4ECFF),
                         ),
                       ),
                       ...teacher.effectiveClasses.map(
-                        (String item) => _SummaryPill(
-                          label: item,
+                        (c) => _SummaryPill(
+                          label: c,
                           tone: const Color(0xFFE8F7EE),
                         ),
                       ),
@@ -3013,7 +2677,7 @@ class _ResultControlWorkspace extends ConsumerWidget {
                 onChanged: controller.setTeacherSubjectIsolation,
               ),
               _PermissionSwitch(
-                label: 'Auto-fill missing practicals with 0',
+                label: 'Auto‑fill missing practicals with 0',
                 value: state.settings.autoZeroMissingPracticals,
                 onChanged: controller.setAutoZeroPracticals,
               ),
@@ -3039,6 +2703,10 @@ class _ResultControlWorkspace extends ConsumerWidget {
     );
   }
 }
+
+// ============================================================================
+// TEACHER SUBJECT RESULT ENTRY WORKSPACE (the most detailed sheet)
+// ============================================================================
 
 class SubjectResultEntryWorkspace extends ConsumerStatefulWidget {
   const SubjectResultEntryWorkspace({
@@ -3067,10 +2735,8 @@ class _SubjectResultEntryWorkspaceState
   late final TextEditingController _studentNameController;
   late final TextEditingController _studentAdmissionController;
   late final TextEditingController _studentAttendanceController;
-  final Map<String, TextEditingController> _scoreControllers =
-      <String, TextEditingController>{};
-  final Map<String, TextEditingController> _practicalControllers =
-      <String, TextEditingController>{};
+  final Map<String, TextEditingController> _scoreControllers = {};
+  final Map<String, TextEditingController> _practicalControllers = {};
   bool _showStudentIntake = false;
 
   @override
@@ -3126,11 +2792,7 @@ class _SubjectResultEntryWorkspaceState
   bool get _usesPracticals {
     return (_selectedClass.startsWith('Form 3') ||
             _selectedClass.startsWith('Form 4')) &&
-        const <String>{
-          'Biology',
-          'Chemistry',
-          'Physics',
-        }.contains(_selectedSubject);
+        const {'Biology', 'Chemistry', 'Physics'}.contains(_selectedSubject);
   }
 
   @override
@@ -3139,12 +2801,11 @@ class _SubjectResultEntryWorkspaceState
     _studentNameController.dispose();
     _studentAdmissionController.dispose();
     _studentAttendanceController.dispose();
-    for (final TextEditingController controller in _scoreControllers.values) {
-      controller.dispose();
+    for (final c in _scoreControllers.values) {
+      c.dispose();
     }
-    for (final TextEditingController controller
-        in _practicalControllers.values) {
-      controller.dispose();
+    for (final c in _practicalControllers.values) {
+      c.dispose();
     }
     super.dispose();
   }
@@ -3155,11 +2816,10 @@ class _SubjectResultEntryWorkspaceState
     final List<StudentResultRecord> classStudents =
         adminState.studentResults
             .where(
-              (StudentResultRecord record) =>
+              (record) =>
                   record.className == _selectedClass &&
                   record.subjectResults.any(
-                    (SubjectResult result) =>
-                        result.subject == _selectedSubject,
+                    (result) => result.subject == _selectedSubject,
                   ),
             )
             .toList()
@@ -3168,7 +2828,7 @@ class _SubjectResultEntryWorkspaceState
         _availableSubjectSessions(classStudents);
     final int completedRows = classStudents
         .where(
-          (StudentResultRecord record) =>
+          (record) =>
               _rowStatus(record, adminState.settings) == _EntryRowStatus.ready,
         )
         .length;
@@ -3253,19 +2913,15 @@ class _SubjectResultEntryWorkspaceState
                           ),
                           items: widget.teacher.effectiveSubjects
                               .map(
-                                (String subject) => DropdownMenuItem<String>(
-                                  value: subject,
-                                  child: Text(subject),
+                                (s) => DropdownMenuItem<String>(
+                                  value: s,
+                                  child: Text(s),
                                 ),
                               )
                               .toList(),
                           onChanged: (String? value) {
-                            if (value == null) {
-                              return;
-                            }
-                            setState(() {
-                              _selectedSubject = value;
-                            });
+                            if (value == null) return;
+                            setState(() => _selectedSubject = value);
                             _loadCurrentSheet();
                           },
                         ),
@@ -3279,16 +2935,14 @@ class _SubjectResultEntryWorkspaceState
                           ),
                           items: ExamType.values
                               .map(
-                                (ExamType type) => DropdownMenuItem<ExamType>(
-                                  value: type,
-                                  child: Text(type.label),
+                                (t) => DropdownMenuItem<ExamType>(
+                                  value: t,
+                                  child: Text(t.label),
                                 ),
                               )
                               .toList(),
                           onChanged: (ExamType? value) {
-                            if (value == null) {
-                              return;
-                            }
+                            if (value == null) return;
                             setState(() {
                               _examType = value;
                               _examLabelController.text = _defaultExamLabel;
@@ -3356,7 +3010,7 @@ class _SubjectResultEntryWorkspaceState
                         )
                       else
                         const _LedgerModeBadge(
-                          label: 'Single-score entry',
+                          label: 'Single‑score entry',
                           tone: Color(0xFFDCFCE7),
                           textColor: Color(0xFF166534),
                         ),
@@ -3388,20 +3042,14 @@ class _SubjectResultEntryWorkspaceState
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
-                    children: widget.teacher.effectiveSubjects.map((
-                      String subject,
-                    ) {
+                    children: widget.teacher.effectiveSubjects.map((subject) {
                       final bool active = subject == _selectedSubject;
                       return _SubjectSelectionChip(
                         label: subject,
                         selected: active,
                         onTap: () {
-                          if (active) {
-                            return;
-                          }
-                          setState(() {
-                            _selectedSubject = subject;
-                          });
+                          if (active) return;
+                          setState(() => _selectedSubject = subject);
                           _loadCurrentSheet();
                         },
                       );
@@ -3415,15 +3063,13 @@ class _SubjectResultEntryWorkspaceState
                     canRegisterStudents: canRegisterStudents,
                     showingIntake: _showStudentIntake,
                     onToggleStudentIntake: () {
-                      setState(() {
-                        _showStudentIntake = !_showStudentIntake;
-                      });
+                      setState(() => _showStudentIntake = !_showStudentIntake);
                     },
                     onReviewSheet: classStudents.isEmpty
                         ? null
                         : () => _reviewSheet(classStudents),
                   ),
-                  if (_showStudentIntake && canRegisterStudents) ...<Widget>[
+                  if (_showStudentIntake && canRegisterStudents) ...[
                     const SizedBox(height: 18),
                     _ResultEntryStudentIntakeCard(
                       className: _selectedClass,
@@ -3437,9 +3083,9 @@ class _SubjectResultEntryWorkspaceState
                   const SizedBox(height: 18),
                   classStudents.isEmpty
                       ? const _ResultEntryEmptyState(
-                          title: 'No registered students for this subject',
+                          title: ManagementStrings.noStudentsForSubject,
                           subtitle:
-                              'Use the add-student action here, or register learners to this class first, then the score ledger will open with their names ready for marks entry.',
+                              'Use the add‑student action here, or register learners to this class first, then the score ledger will open with their names ready for marks entry.',
                         )
                       : _SubjectEntryLedger(
                           records: classStudents,
@@ -3561,9 +3207,7 @@ class _SubjectResultEntryWorkspaceState
               subtitle:
                   'This side rail keeps the current class ranking visible without leaving the marksheet.',
               child: Column(
-                children: classStudents.take(6).map((
-                  StudentResultRecord record,
-                ) {
+                children: classStudents.take(6).map((record) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _ResultEntrySnapshotTile(record: record),
@@ -3614,63 +3258,44 @@ class _SubjectResultEntryWorkspaceState
 
   SubjectResult _subjectResultFor(StudentResultRecord record) {
     return record.subjectResults.firstWhere(
-      (SubjectResult result) => result.subject == _selectedSubject,
+      (result) => result.subject == _selectedSubject,
     );
   }
 
   double? _parsedScore(TextEditingController? controller) {
-    if (controller == null) {
-      return null;
-    }
-    final String text = controller.text.trim();
-    if (text.isEmpty) {
-      return null;
-    }
+    if (controller == null) return null;
+    final text = controller.text.trim();
+    if (text.isEmpty) return null;
     return double.tryParse(text);
   }
 
   double? _combinedScore(StudentResultRecord record, SchoolSettings settings) {
-    final double? theory = _parsedScore(_scoreControllers[record.id]);
-    if (!_usesPracticals) {
-      return theory?.clamp(0, 100);
-    }
-    final double? practical = _parsedScore(_practicalControllers[record.id]);
-    if (theory == null && practical == null) {
-      return null;
-    }
-    if (theory == null) {
-      return null;
-    }
-    if (practical == null && !settings.autoZeroMissingPracticals) {
-      return null;
-    }
-    final double resolvedPractical = practical ?? 0;
-    return (((theory) + resolvedPractical) / 2).clamp(0, 100);
+    final theory = _parsedScore(_scoreControllers[record.id]);
+    if (!_usesPracticals) return theory?.clamp(0, 100);
+    final practical = _parsedScore(_practicalControllers[record.id]);
+    if (theory == null && practical == null) return null;
+    if (theory == null) return null;
+    if (practical == null && !settings.autoZeroMissingPracticals) return null;
+    final resolvedPractical = practical ?? 0;
+    return ((theory + resolvedPractical) / 2).clamp(0, 100);
   }
 
   String _previewGrade(StudentResultRecord record, SchoolSettings settings) {
-    final double? combinedScore = _combinedScore(record, settings);
-    if (combinedScore == null) {
-      return _subjectResultFor(record).grade;
-    }
-    return NectaOLevelCalculator.gradeForScore(combinedScore).letter;
+    final combined = _combinedScore(record, settings);
+    if (combined == null) return _subjectResultFor(record).grade;
+    return NectaOLevelCalculator.gradeForScore(combined).letter;
   }
 
   _EntryRowStatus _rowStatus(
     StudentResultRecord record,
     SchoolSettings settings,
   ) {
-    final double? theory = _parsedScore(_scoreControllers[record.id]);
-    if (theory == null) {
-      return _EntryRowStatus.pending;
-    }
-    if (!_usesPracticals) {
+    final theory = _parsedScore(_scoreControllers[record.id]);
+    if (theory == null) return _EntryRowStatus.pending;
+    if (!_usesPracticals) return _EntryRowStatus.ready;
+    final practical = _parsedScore(_practicalControllers[record.id]);
+    if (practical != null || settings.autoZeroMissingPracticals)
       return _EntryRowStatus.ready;
-    }
-    final double? practical = _parsedScore(_practicalControllers[record.id]);
-    if (practical != null || settings.autoZeroMissingPracticals) {
-      return _EntryRowStatus.ready;
-    }
     return _EntryRowStatus.partial;
   }
 
@@ -3678,18 +3303,12 @@ class _SubjectResultEntryWorkspaceState
     List<StudentResultRecord> classStudents,
     SchoolSettings settings,
   ) {
-    final List<double> scores = classStudents
-        .map((StudentResultRecord record) => _combinedScore(record, settings))
+    final scores = classStudents
+        .map((r) => _combinedScore(r, settings))
         .whereType<double>()
         .toList();
-    if (scores.isEmpty) {
-      return 0;
-    }
-    final double total = scores.fold<double>(
-      0,
-      (double sum, double value) => sum + value,
-    );
-    return total / scores.length;
+    if (scores.isEmpty) return 0;
+    return scores.fold<double>(0, (sum, v) => sum + v) / scores.length;
   }
 
   StudentResultRecord? _topEnteredStudent(
@@ -3697,14 +3316,12 @@ class _SubjectResultEntryWorkspaceState
     SchoolSettings settings,
   ) {
     StudentResultRecord? leader;
-    double? highestScore;
-    for (final StudentResultRecord record in classStudents) {
-      final double? score = _combinedScore(record, settings);
-      if (score == null) {
-        continue;
-      }
-      if (highestScore == null || score > highestScore) {
-        highestScore = score;
+    double? highest;
+    for (final record in classStudents) {
+      final score = _combinedScore(record, settings);
+      if (score == null) continue;
+      if (highest == null || score > highest) {
+        highest = score;
         leader = record;
       }
     }
@@ -3714,16 +3331,12 @@ class _SubjectResultEntryWorkspaceState
   List<_ExistingSheetSession> _availableSubjectSessions(
     List<StudentResultRecord> classStudents,
   ) {
-    final Map<String, _ExistingSheetSession> sessions =
-        <String, _ExistingSheetSession>{};
-
-    for (final StudentResultRecord record in classStudents) {
-      final SubjectResult subjectResult = _subjectResultFor(record);
-      for (final _StudentExamSessionSummary summary in _sessionHistoryFor(
-        subjectResult,
-      )) {
-        final _ExistingSheetSession? current = sessions[summary.sessionKey];
-        final _ExistingSheetSession candidate = _ExistingSheetSession(
+    final Map<String, _ExistingSheetSession> sessions = {};
+    for (final record in classStudents) {
+      final subjectResult = _subjectResultFor(record);
+      for (final summary in _sessionHistoryFor(subjectResult)) {
+        final current = sessions[summary.sessionKey];
+        final candidate = _ExistingSheetSession(
           sessionKey: summary.sessionKey,
           examLabel: summary.label,
           examType: summary.type,
@@ -3734,19 +3347,15 @@ class _SubjectResultEntryWorkspaceState
         sessions[summary.sessionKey] = candidate;
       }
     }
-
-    final List<_ExistingSheetSession> ordered = sessions.values.toList()
-      ..sort(
-        (_ExistingSheetSession a, _ExistingSheetSession b) =>
-            b.examDate.compareTo(a.examDate),
-      );
+    final ordered = sessions.values.toList()
+      ..sort((a, b) => b.examDate.compareTo(a.examDate));
     return ordered;
   }
 
   List<_StudentExamSessionSummary> _sessionHistoryFor(SubjectResult result) {
-    final Map<String, List<ExamMark>> grouped = <String, List<ExamMark>>{};
-    for (final ExamMark mark in result.examMarks) {
-      final String key =
+    final Map<String, List<ExamMark>> grouped = {};
+    for (final mark in result.examMarks) {
+      final key =
           mark.sessionKey ??
           _sheetSessionKey(
             subject: result.subject,
@@ -3754,33 +3363,23 @@ class _SubjectResultEntryWorkspaceState
             examLabel: mark.label,
             examDate: mark.examDate ?? DateTime(2000),
           );
-      grouped.putIfAbsent(key, () => <ExamMark>[]).add(mark);
+      grouped.putIfAbsent(key, () => []).add(mark);
     }
-
-    final List<_StudentExamSessionSummary> history =
-        grouped.entries.map((MapEntry<String, List<ExamMark>> entry) {
-          final List<ExamMark> marks = entry.value;
-          final ExamMark lead = marks.first;
-          final double score =
-              marks.fold<double>(
-                0,
-                (double total, ExamMark mark) => total + mark.score,
-              ) /
-              marks.length;
-          return _StudentExamSessionSummary(
-            sessionKey: entry.key,
-            label: lead.label,
-            type: lead.type,
-            examDate: lead.examDate ?? DateTime(2000),
-            score: score,
-            componentCount: marks.length,
-            teacherName: lead.teacherName,
-          );
-        }).toList()..sort(
-          (_StudentExamSessionSummary a, _StudentExamSessionSummary b) =>
-              b.examDate.compareTo(a.examDate),
-        );
-    return history;
+    return grouped.entries.map((entry) {
+      final marks = entry.value;
+      final lead = marks.first;
+      final score =
+          marks.fold<double>(0, (sum, m) => sum + m.score) / marks.length;
+      return _StudentExamSessionSummary(
+        sessionKey: entry.key,
+        label: lead.label,
+        type: lead.type,
+        examDate: lead.examDate ?? DateTime(2000),
+        score: score,
+        componentCount: marks.length,
+        teacherName: lead.teacherName,
+      );
+    }).toList()..sort((a, b) => b.examDate.compareTo(a.examDate));
   }
 
   void _applyExistingSession(_ExistingSheetSession session) {
@@ -3801,15 +3400,15 @@ class _SubjectResultEntryWorkspaceState
   }
 
   void _registerStudentFromSheet() {
-    final String name = _studentNameController.text.trim();
+    final name = _studentNameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter the student full name first.')),
       );
       return;
     }
-    final String admission = _studentAdmissionController.text.trim();
-    final double? attendance = double.tryParse(
+    final admission = _studentAdmissionController.text.trim();
+    final attendance = double.tryParse(
       _studentAttendanceController.text.trim(),
     );
     if (attendance == null) {
@@ -3834,9 +3433,7 @@ class _SubjectResultEntryWorkspaceState
     _studentAdmissionController.clear();
     _studentAttendanceController.text = '92';
 
-    setState(() {
-      _showStudentIntake = false;
-    });
+    setState(() => _showStudentIntake = false);
     _loadCurrentSheet();
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -3853,14 +3450,14 @@ class _SubjectResultEntryWorkspaceState
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (BuildContext bottomSheetContext) {
+      builder: (bottomSheetContext) {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
+              children: [
                 Text(
                   'Review subject sheet',
                   style: Theme.of(context).textTheme.headlineSmall,
@@ -3876,7 +3473,7 @@ class _SubjectResultEntryWorkspaceState
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
-                  children: <Widget>[
+                  children: [
                     _SummaryPill(
                       label: _selectedSubject,
                       tone: const Color(0xFFDBEAFE),
@@ -3900,7 +3497,7 @@ class _SubjectResultEntryWorkspaceState
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
-                      columns: <DataColumn>[
+                      columns: [
                         const DataColumn(label: Text('Student')),
                         const DataColumn(label: Text('Admission')),
                         const DataColumn(label: Text('Grade')),
@@ -3910,19 +3507,19 @@ class _SubjectResultEntryWorkspaceState
                         const DataColumn(label: Text('Combined')),
                         const DataColumn(label: Text('Status')),
                       ],
-                      rows: classStudents.map((StudentResultRecord record) {
-                        final double? theory = _parsedScore(
+                      rows: classStudents.map((record) {
+                        final theory = _parsedScore(
                           _scoreControllers[record.id],
                         );
-                        final double? practical = _parsedScore(
+                        final practical = _parsedScore(
                           _practicalControllers[record.id],
                         );
-                        final double? combined = _combinedScore(
+                        final combined = _combinedScore(
                           record,
                           ref.read(schoolAdminProvider).settings,
                         );
                         return DataRow(
-                          cells: <DataCell>[
+                          cells: [
                             DataCell(Text(record.studentName)),
                             DataCell(Text(record.admissionNumber)),
                             DataCell(
@@ -3975,7 +3572,7 @@ class _SubjectResultEntryWorkspaceState
                 Wrap(
                   spacing: 12,
                   runSpacing: 12,
-                  children: <Widget>[
+                  children: [
                     FilledButton.icon(
                       onPressed: () {
                         Navigator.of(bottomSheetContext).pop();
@@ -4000,13 +3597,11 @@ class _SubjectResultEntryWorkspaceState
   }
 
   void _loadCurrentSheet() {
-    final SchoolAdminState state = ref.read(schoolAdminProvider);
-    final List<StudentResultRecord> classStudents = state.studentResults
-        .where(
-          (StudentResultRecord record) => record.className == _selectedClass,
-        )
+    final state = ref.read(schoolAdminProvider);
+    final classStudents = state.studentResults
+        .where((r) => r.className == _selectedClass)
         .toList();
-    final String sessionKey = _sheetSessionKey(
+    final sessionKey = _sheetSessionKey(
       subject: _selectedSubject,
       examType: _examType,
       examLabel: _examLabelController.text.trim().isEmpty
@@ -4015,26 +3610,23 @@ class _SubjectResultEntryWorkspaceState
       examDate: _selectedExamDate,
     );
 
-    for (final TextEditingController controller in _scoreControllers.values) {
-      controller.dispose();
+    for (final c in _scoreControllers.values) {
+      c.dispose();
     }
-    for (final TextEditingController controller
-        in _practicalControllers.values) {
-      controller.dispose();
+    for (final c in _practicalControllers.values) {
+      c.dispose();
     }
     _scoreControllers.clear();
     _practicalControllers.clear();
 
-    for (final StudentResultRecord record in classStudents) {
-      final SubjectResult subjectResult = record.subjectResults.firstWhere(
-        (SubjectResult result) => result.subject == _selectedSubject,
+    for (final record in classStudents) {
+      final subjectResult = record.subjectResults.firstWhere(
+        (r) => r.subject == _selectedSubject,
       );
       ExamMark? theoryMark;
       ExamMark? practicalMark;
-      for (final ExamMark mark in subjectResult.examMarks) {
-        if (mark.sessionKey != sessionKey) {
-          continue;
-        }
+      for (final mark in subjectResult.examMarks) {
+        if (mark.sessionKey != sessionKey) continue;
         if (theoryMark == null && mark.examDate != null) {
           _selectedExamDate = mark.examDate!;
         }
@@ -4044,7 +3636,6 @@ class _SubjectResultEntryWorkspaceState
           theoryMark = mark;
         }
       }
-
       _scoreControllers[record.id] = TextEditingController(
         text: theoryMark == null ? '' : theoryMark.score.toStringAsFixed(1),
       );
@@ -4055,13 +3646,11 @@ class _SubjectResultEntryWorkspaceState
       );
     }
 
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
   void _saveSheet(List<StudentResultRecord> classStudents) {
-    final String examLabel = _examLabelController.text.trim();
+    final examLabel = _examLabelController.text.trim();
     if (examLabel.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter the exam label before saving.')),
@@ -4069,13 +3658,13 @@ class _SubjectResultEntryWorkspaceState
       return;
     }
 
-    final SchoolAdminState state = ref.read(schoolAdminProvider);
-    final Map<String, double> theoryScores = <String, double>{};
-    final Map<String, double> practicalScores = <String, double>{};
+    final state = ref.read(schoolAdminProvider);
+    final theoryScores = <String, double>{};
+    final practicalScores = <String, double>{};
 
-    for (final StudentResultRecord record in classStudents) {
-      final String theoryText = _scoreControllers[record.id]?.text.trim() ?? '';
-      final double? theory = double.tryParse(theoryText);
+    for (final record in classStudents) {
+      final theoryText = _scoreControllers[record.id]?.text.trim() ?? '';
+      final theory = double.tryParse(theoryText);
       if (theory == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -4089,7 +3678,7 @@ class _SubjectResultEntryWorkspaceState
       theoryScores[record.id] = theory.clamp(0, 100);
 
       if (_usesPracticals) {
-        final String practicalText =
+        final practicalText =
             _practicalControllers[record.id]?.text.trim() ?? '';
         final double? practical = practicalText.isEmpty
             ? (state.settings.autoZeroMissingPracticals ? 0 : null)
@@ -4098,7 +3687,7 @@ class _SubjectResultEntryWorkspaceState
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Enter the practical score for ${record.studentName} or enable auto-zero in settings.',
+                'Enter the practical score for ${record.studentName} or enable auto‑zero in settings.',
               ),
             ),
           );
@@ -4132,21 +3721,21 @@ class _SubjectResultEntryWorkspaceState
   }
 
   Future<void> _pickExamDate() async {
-    final DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: _selectedExamDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
-    if (picked == null) {
-      return;
-    }
-    setState(() {
-      _selectedExamDate = picked;
-    });
+    if (picked == null) return;
+    setState(() => _selectedExamDate = picked);
     _loadCurrentSheet();
   }
 }
+
+// ============================================================================
+// SHARED HELPER WIDGETS & TYPES
+// ============================================================================
 
 enum _EntryRowStatus { pending, partial, ready }
 
@@ -4213,11 +3802,7 @@ class _ResultEntryHeroPanel extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
-          colors: <Color>[
-            Color(0xFF08111F),
-            Color(0xFF123761),
-            Color(0xFF0F766E),
-          ],
+          colors: [Color(0xFF08111F), Color(0xFF123761), Color(0xFF0F766E)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -4276,16 +3861,15 @@ class _ResultEntryHeroPanel extends StatelessWidget {
             subtitle,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: Colors.white.withValues(alpha: 0.84),
-              height: 1.45,
             ),
           ),
           const SizedBox(height: 20),
           Wrap(
             spacing: 14,
             runSpacing: 14,
-            children: summary.map((final _ResultEntryMetricData item) {
-              return _ResultEntryMetricCard(data: item);
-            }).toList(),
+            children: summary
+                .map((item) => _ResultEntryMetricCard(data: item))
+                .toList(),
           ),
         ],
       ),
@@ -4379,7 +3963,7 @@ class _ResultEntrySurface extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const <BoxShadow>[
+        boxShadow: const [
           BoxShadow(
             color: Color(0x120F172A),
             blurRadius: 28,
@@ -4405,10 +3989,9 @@ class _ResultEntrySurface extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF475569),
-                height: 1.45,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF475569)),
             ),
             const SizedBox(height: 20),
             child,
@@ -4475,12 +4058,12 @@ class _SessionHistoryPanel extends StatelessWidget {
               ),
             ],
           ),
-          if (sessions.isNotEmpty) ...<Widget>[
+          if (sessions.isNotEmpty) ...[
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,
               runSpacing: 12,
-              children: sessions.map((_ExistingSheetSession session) {
+              children: sessions.map((session) {
                 final bool active = session.sessionKey == activeSessionKey;
                 return InkWell(
                   onTap: () => onEditSession(session),
@@ -4533,7 +4116,7 @@ class _SessionHistoryPanel extends StatelessWidget {
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: const Color(0xFF64748B)),
                         ),
-                        if (session.teacherName != null) ...<Widget>[
+                        if (session.teacherName != null) ...[
                           const SizedBox(height: 6),
                           Text(
                             session.teacherName!,
@@ -4879,16 +4462,12 @@ class _SubjectEntryLedger extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            ...records.asMap().entries.map((
-              MapEntry<int, StudentResultRecord> entry,
-            ) {
-              final StudentResultRecord record = entry.value;
-              final SubjectResult subjectResult = subjectResultsFor(record);
-              final List<_StudentExamSessionSummary> history = historyFor(
-                record,
-              );
-              final _EntryRowStatus status = rowStatusFor(record);
-              final double? combinedScore = combinedScoreFor(record);
+            ...records.asMap().entries.map((entry) {
+              final record = entry.value;
+              final subjectResult = subjectResultsFor(record);
+              final history = historyFor(record);
+              final status = rowStatusFor(record);
+              final combinedScore = combinedScoreFor(record);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Container(
@@ -4997,7 +4576,7 @@ class _SubjectEntryLedger extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Missing practical scores currently auto-fill as 0 from school settings.',
+                  'Missing practical scores currently auto‑fill as 0 from school settings.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: const Color(0xFF64748B),
                   ),
@@ -5092,10 +4671,9 @@ class _RecordedSessionStrip extends StatelessWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: history.take(3).map((_StudentExamSessionSummary item) {
-        final String label =
-            '${item.type.label} ${item.score.toStringAsFixed(1)}';
-        final String detail = item.componentCount > 1
+      children: history.take(3).map((item) {
+        final label = '${item.type.label} ${item.score.toStringAsFixed(1)}';
+        final detail = item.componentCount > 1
             ? '${item.label} • T+P'
             : item.label;
         return Tooltip(
@@ -5307,11 +4885,7 @@ class _OperationsHeroCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
-          colors: <Color>[
-            Color(0xFF0F172A),
-            Color(0xFF163C69),
-            Color(0xFF0F766E),
-          ],
+          colors: [Color(0xFF0F172A), Color(0xFF163C69), Color(0xFF0F766E)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -5338,7 +4912,7 @@ class _OperationsHeroCard extends StatelessWidget {
             runSpacing: 10,
             children: pills
                 .map(
-                  (String item) => _SummaryPill(
+                  (item) => _SummaryPill(
                     label: item,
                     tone: Colors.white.withValues(alpha: 0.14),
                     textColor: Colors.white,
@@ -5425,48 +4999,38 @@ class _SubjectEntryClassAnalysis extends StatelessWidget {
     }
 
     final double classAverage =
-        records.fold<double>(
-          0,
-          (double sum, StudentResultRecord record) => sum + record.averageScore,
-        ) /
+        records.fold<double>(0, (sum, r) => sum + r.averageScore) /
         records.length;
-    final List<StudentResultRecord> ranked = <StudentResultRecord>[...records]
-      ..sort(
-        (StudentResultRecord a, StudentResultRecord b) =>
-            b.averageScore.compareTo(a.averageScore),
-      );
-    final StudentResultRecord topStudent = ranked.first;
-    final SubjectResult? strongestSubjectResult = records
+    final ranked = [...records]
+      ..sort((a, b) => b.averageScore.compareTo(a.averageScore));
+    final topStudent = ranked.first;
+    final strongestSubjectResult = records
         .map(
-          (StudentResultRecord record) => record.subjectResults.firstWhere(
-            (SubjectResult result) => result.subject == subject,
+          (r) => r.subjectResults.firstWhere(
+            (sr) => sr.subject == subject,
             orElse: () => const SubjectResult(
               subject: 'Unknown',
-              examMarks: <ExamMark>[],
+              examMarks: [],
               averageScore: 0,
               grade: 'F',
               gradePoint: 5,
             ),
           ),
         )
-        .where((SubjectResult result) => result.subject == subject)
-        .fold<SubjectResult?>(null, (
-          SubjectResult? current,
-          SubjectResult next,
-        ) {
-          if (current == null || next.averageScore > current.averageScore) {
+        .where((sr) => sr.subject == subject)
+        .fold<SubjectResult?>(null, (current, next) {
+          if (current == null || next.averageScore > current.averageScore)
             return next;
-          }
           return current;
         });
-    final Map<String, int> divisionSpread = <String, int>{
+    final divisionSpread = <String, int>{
       'Division I': 0,
       'Division II': 0,
       'Division III': 0,
       'Division IV': 0,
       'Division 0': 0,
     };
-    for (final StudentResultRecord record in records) {
+    for (final record in records) {
       divisionSpread[record.division] =
           (divisionSpread[record.division] ?? 0) + 1;
     }
@@ -5497,7 +5061,7 @@ class _SubjectEntryClassAnalysis extends StatelessWidget {
         Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: divisionSpread.entries.map((MapEntry<String, int> entry) {
+          children: divisionSpread.entries.map((entry) {
             return _SummaryPill(
               label: '${entry.key}: ${entry.value}',
               tone: const Color(0xFFF8FAFC),
@@ -5509,174 +5073,156 @@ class _SubjectEntryClassAnalysis extends StatelessWidget {
   }
 }
 
+// ============================================================================
+// DIALOG HELPERS
+// ============================================================================
+
 Future<void> _showTeacherEditorDialog(
   BuildContext context,
   WidgetRef ref, {
   TeacherAccount? teacher,
 }) async {
   final bool editing = teacher != null;
-  final TextEditingController nameController = TextEditingController(
-    text: teacher?.name ?? '',
-  );
-  final TextEditingController emailController = TextEditingController(
-    text: teacher?.email ?? '',
-  );
-  final Set<String> selectedSubjects = <String>{...?teacher?.effectiveSubjects}
-    ..removeWhere((String value) => value.trim().isEmpty);
-  final Set<String> selectedClasses = <String>{...?teacher?.effectiveClasses}
-    ..removeWhere((String value) => value.trim().isEmpty);
-  if (selectedSubjects.isEmpty) {
-    selectedSubjects.add('Basic Mathematics');
-  }
-  if (selectedClasses.isEmpty) {
-    selectedClasses.add('Form 1 A');
-  }
+  final nameController = TextEditingController(text: teacher?.name ?? '');
+  final emailController = TextEditingController(text: teacher?.email ?? '');
+  final selectedSubjects = <String>{...?teacher?.effectiveSubjects}
+    ..removeWhere((s) => s.trim().isEmpty);
+  final selectedClasses = <String>{...?teacher?.effectiveClasses}
+    ..removeWhere((s) => s.trim().isEmpty);
+  if (selectedSubjects.isEmpty) selectedSubjects.add('Basic Mathematics');
+  if (selectedClasses.isEmpty) selectedClasses.add('Form 1 A');
 
   await showDialog<void>(
     context: context,
-    builder: (BuildContext dialogContext) {
+    builder: (dialogContext) {
       return StatefulBuilder(
-        builder:
-            (BuildContext context, void Function(void Function()) setState) {
-              return AlertDialog(
-                title: Text(
-                  editing ? 'Edit Teacher Assignment' : 'Register Teacher',
-                ),
-                content: SizedBox(
-                  width: 640,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        TextField(
-                          controller: nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Teacher name',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: emailController,
-                          decoration: const InputDecoration(labelText: 'Email'),
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Assign up to two subjects',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: kNectaOLevelSubjectNames.map((
-                            String subject,
-                          ) {
-                            final bool selected = selectedSubjects.contains(
-                              subject,
-                            );
-                            final bool locked =
-                                !selected && selectedSubjects.length >= 2;
-                            return FilterChip(
-                              label: Text(subject),
-                              selected: selected,
-                              onSelected: locked
-                                  ? null
-                                  : (bool value) {
-                                      setState(() {
-                                        if (value) {
-                                          selectedSubjects.add(subject);
-                                        } else {
-                                          selectedSubjects.remove(subject);
-                                        }
-                                        if (selectedSubjects.isEmpty) {
-                                          selectedSubjects.add(
-                                            'Basic Mathematics',
-                                          );
-                                        }
-                                      });
-                                    },
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Classes taught',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: kClassCatalog
-                              .expand((ClassCluster item) => item.classNames)
-                              .map((String schoolClass) {
-                                return FilterChip(
-                                  label: Text(schoolClass),
-                                  selected: selectedClasses.contains(
-                                    schoolClass,
-                                  ),
-                                  onSelected: (bool value) {
-                                    setState(() {
-                                      if (value) {
-                                        selectedClasses.add(schoolClass);
-                                      } else {
-                                        selectedClasses.remove(schoolClass);
-                                      }
-                                      if (selectedClasses.isEmpty) {
-                                        selectedClasses.add('Form 1 A');
-                                      }
-                                    });
-                                  },
-                                );
-                              })
-                              .toList(),
-                        ),
-                      ],
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Text(
+              editing ? 'Edit Teacher Assignment' : 'Register Teacher',
+            ),
+            content: SizedBox(
+              width: 640,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Teacher name',
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailController,
+                      decoration: const InputDecoration(labelText: 'Email'),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Assign up to two subjects',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: kNectaOLevelSubjectNames.map((subject) {
+                        final selected = selectedSubjects.contains(subject);
+                        final locked =
+                            !selected && selectedSubjects.length >= 2;
+                        return FilterChip(
+                          label: Text(subject),
+                          selected: selected,
+                          onSelected: locked
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    if (value) {
+                                      selectedSubjects.add(subject);
+                                    } else {
+                                      selectedSubjects.remove(subject);
+                                    }
+                                    if (selectedSubjects.isEmpty) {
+                                      selectedSubjects.add('Basic Mathematics');
+                                    }
+                                  });
+                                },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Classes taught',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: kClassCatalog.expand((c) => c.classNames).map((
+                        schoolClass,
+                      ) {
+                        return FilterChip(
+                          label: Text(schoolClass),
+                          selected: selectedClasses.contains(schoolClass),
+                          onSelected: (value) {
+                            setState(() {
+                              if (value) {
+                                selectedClasses.add(schoolClass);
+                              } else {
+                                selectedClasses.remove(schoolClass);
+                              }
+                              if (selectedClasses.isEmpty) {
+                                selectedClasses.add('Form 1 A');
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: () {
-                      final String name = nameController.text.trim();
-                      final String email = emailController.text.trim();
-                      if (name.isEmpty || !email.contains('@')) {
-                        return;
-                      }
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final name = nameController.text.trim();
+                  final email = emailController.text.trim();
+                  if (name.isEmpty || !email.contains('@')) return;
 
-                      final List<String> subjects = selectedSubjects.toList();
-                      final List<String> classes = selectedClasses.toList();
-                      final SchoolAdminController controller = ref.read(
-                        schoolAdminProvider.notifier,
-                      );
+                  final subjects = selectedSubjects.toList();
+                  final classes = selectedClasses.toList();
+                  final controller = ref.read(schoolAdminProvider.notifier);
 
-                      if (editing) {
-                        controller.updateTeacherAssignments(
-                          teacherId: teacher.id,
-                          subjects: subjects,
-                          assignedClasses: classes,
-                        );
-                      } else {
-                        controller.addTeacher(
-                          name: name,
-                          email: email,
-                          subjects: subjects,
-                          assignedClasses: classes,
-                        );
-                      }
+                  if (editing) {
+                    controller.updateTeacherAssignments(
+                      teacherId: teacher.id,
+                      subjects: subjects,
+                      assignedClasses: classes,
+                    );
+                  } else {
+                    controller.addTeacher(
+                      name: name,
+                      email: email,
+                      subjects: subjects,
+                      assignedClasses: classes,
+                    );
+                  }
 
-                      Navigator.of(dialogContext).pop();
-                    },
-                    child: Text(editing ? 'Save' : 'Register'),
-                  ),
-                ],
-              );
-            },
+                  Navigator.of(dialogContext).pop();
+                },
+                child: Text(editing ? 'Save' : 'Register'),
+              ),
+            ],
+          );
+        },
       );
     },
   );
@@ -5692,7 +5238,7 @@ Future<void> _showRemoveTeacherDialog(
 ) async {
   await showDialog<void>(
     context: context,
-    builder: (BuildContext dialogContext) {
+    builder: (dialogContext) {
       return AlertDialog(
         title: const Text('Remove Teacher'),
         content: Text(
@@ -5722,7 +5268,40 @@ String _sheetSessionKey({
   required String examLabel,
   required DateTime examDate,
 }) {
-  final String month = examDate.month.toString().padLeft(2, '0');
-  final String day = examDate.day.toString().padLeft(2, '0');
-  return '${subject.toLowerCase()}-${examType.name}-${examLabel.toLowerCase().replaceAll(' ', '-')}-${examDate.year}-$month-$day';
+  final month = examDate.month.toString().padLeft(2, '0');
+  final day = examDate.day.toString().padLeft(2, '0');
+  return '${subject.toLowerCase()}-${examType.name}-'
+      '${examLabel.toLowerCase().replaceAll(' ', '-')}'
+      '-${examDate.year}-$month-$day';
 }
+
+// ============================================================================
+// CONSTANTS (moved from top of original for reference)
+// ============================================================================
+
+@immutable
+class ClassCluster {
+  const ClassCluster({required this.formLabel, required this.classNames});
+
+  final String formLabel;
+  final List<String> classNames;
+}
+
+const List<ClassCluster> kClassCatalog = <ClassCluster>[
+  ClassCluster(
+    formLabel: 'Form 1',
+    classNames: <String>['Form 1 A', 'Form 1 B'],
+  ),
+  ClassCluster(
+    formLabel: 'Form 2',
+    classNames: <String>['Form 2 A', 'Form 2 B'],
+  ),
+  ClassCluster(
+    formLabel: 'Form 3',
+    classNames: <String>['Form 3 A', 'Form 3 B'],
+  ),
+  ClassCluster(
+    formLabel: 'Form 4',
+    classNames: <String>['Form 4 A', 'Form 4 B'],
+  ),
+];
