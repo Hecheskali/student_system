@@ -631,35 +631,8 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
         ),
       ],
       sections: <ReportExportSection>[
-        ReportExportSection(
-          title: 'Student Results',
-          note:
-              'Division is calculated from the best seven O-Level subjects together with the recorded inter-exam averages.',
-          headers: const <String>[
-            'Student',
-            'Admission',
-            'Class',
-            'Average',
-            'Inter Exam',
-            'Division',
-            'Division Points',
-            'Attendance',
-            'Exams Conducted',
-          ],
-          rows: filteredRecords.map((StudentResultRecord record) {
-            return <Object?>[
-              record.studentName,
-              record.admissionNumber,
-              record.className,
-              record.averageScore.toStringAsFixed(1),
-              record.interExamAverage.toStringAsFixed(1),
-              record.division,
-              record.divisionPoints,
-              record.attendanceRate.toStringAsFixed(1),
-              record.examsConducted,
-            ];
-          }).toList(),
-        ),
+        // Build subject matrix
+        _buildStudentSubjectMatrix(filteredRecords),
       ],
       footnote:
           'Generated from the live results center. Export formats available: Excel and PDF.',
@@ -824,6 +797,56 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
         return const Color(0xFFB91C1C);
     }
   }
+}
+
+ReportExportSection _buildStudentSubjectMatrix(
+  List<StudentResultRecord> records,
+) {
+  // Get all unique subjects from all students
+  final Set<String> allSubjects = <String>{};
+  for (final StudentResultRecord record in records) {
+    for (final SubjectResult subject in record.subjectResults) {
+      allSubjects.add(subject.subject);
+    }
+  }
+
+  final List<String> sortedSubjects = allSubjects.toList()..sort();
+
+  // Build matrix rows
+  final List<List<Object?>> rows = <List<Object?>>[];
+  for (final StudentResultRecord record in records) {
+    final List<Object?> row = <Object?>[
+      '${record.studentName}\n(${record.admissionNumber})',
+    ];
+
+    for (final String subject in sortedSubjects) {
+      final SubjectResult? result = record.subjectResults.firstWhere(
+        (SubjectResult r) => r.subject == subject,
+        orElse: () => SubjectResult(
+          subject: subject,
+          averageScore: 0,
+          grade: '-',
+          gradePoint: '-',
+          examMarks: const <ExamMark>[],
+        ),
+      );
+
+      if (result.examMarks.isEmpty) {
+        row.add('-');
+      } else {
+        row.add('${result.averageScore.toStringAsFixed(1)}\n(${result.grade})');
+      }
+    }
+
+    rows.add(row);
+  }
+
+  return ReportExportSection(
+    title: 'Student Subject Matrix',
+    note: 'Marks and grades by student and subject.',
+    headers: <String>['Student', ...sortedSubjects],
+    rows: rows,
+  );
 }
 
 class _ResultsClassSelector extends StatelessWidget {
