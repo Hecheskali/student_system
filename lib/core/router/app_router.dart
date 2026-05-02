@@ -51,7 +51,7 @@ class AppRouter {
       GoRoute(
         path: '/manage',
         builder: (context, state) => ManagementScreen(
-          initialTab: state.uri.queryParameters['tab'] ?? 'students',
+          initialTab: state.uri.queryParameters['tab'] ?? 'upload',
         ),
       ),
       GoRoute(

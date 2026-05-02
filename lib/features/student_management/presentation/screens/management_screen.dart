@@ -12,7 +12,7 @@ import '../widgets/motion_widgets.dart';
 import '../widgets/workspace_shell.dart';
 
 class ManagementScreen extends StatelessWidget {
-  const ManagementScreen({super.key, this.initialTab = 'students'});
+  const ManagementScreen({super.key, this.initialTab = 'upload'});
 
   final String initialTab;
 
@@ -34,11 +34,11 @@ class ManagementScreen extends StatelessWidget {
 
         switch (session.role) {
           case UserRole.headOfSchool:
-            return const HeadmasterManagementScreen();
+            return HeadmasterManagementScreen(initialTab: initialTab);
           case UserRole.academicMaster:
-            return const AcademicMasterManagementScreen();
+            return AcademicMasterManagementScreen(initialTab: initialTab);
           case UserRole.teacher:
-            return const TeacherManagementScreen();
+            return TeacherManagementScreen(initialTab: initialTab);
         }
       },
     );
@@ -1794,35 +1794,43 @@ const List<ClassCluster> kClassCatalog = <ClassCluster>[
 ];
 
 class HeadmasterManagementScreen extends ConsumerWidget {
-  const HeadmasterManagementScreen({super.key});
+  const HeadmasterManagementScreen({super.key, this.initialTab = 'upload'});
+
+  final String initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const _LeadershipManagementScreen(
+    return _LeadershipManagementScreen(
       title: 'Headmaster Operations',
       subtitle:
           'Register teachers, assign one or two subjects, manage school-wide permissions, and keep student intake moving.',
       canRemoveTeachers: true,
+      initialTab: initialTab,
     );
   }
 }
 
 class AcademicMasterManagementScreen extends ConsumerWidget {
-  const AcademicMasterManagementScreen({super.key});
+  const AcademicMasterManagementScreen({super.key, this.initialTab = 'upload'});
+
+  final String initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const _LeadershipManagementScreen(
+    return _LeadershipManagementScreen(
       title: 'Academic Operations',
       subtitle:
           'Control result windows, assign teacher subjects, and review the active reporting cycle before final school reports are downloaded.',
       canRemoveTeachers: false,
+      initialTab: initialTab,
     );
   }
 }
 
 class TeacherManagementScreen extends ConsumerWidget {
-  const TeacherManagementScreen({super.key});
+  const TeacherManagementScreen({super.key, this.initialTab = 'students'});
+
+  final String initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1833,6 +1841,7 @@ class TeacherManagementScreen extends ConsumerWidget {
 
     return DefaultTabController(
       length: 2,
+      initialIndex: _teacherInitialTabIndex(initialTab),
       child: WorkspaceShell(
         currentSection: WorkspaceSection.operations,
         session: session,
@@ -1938,30 +1947,52 @@ class _LeadershipManagementScreen extends ConsumerWidget {
     required this.title,
     required this.subtitle,
     required this.canRemoveTeachers,
+    required this.initialTab,
   });
 
   final String title;
   final String subtitle;
   final bool canRemoveTeachers;
+  final String initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final SchoolAdminState adminState = ref.watch(schoolAdminProvider);
     final SchoolOverview overview = ref.watch(schoolOverviewProvider);
     final SessionUser session = adminState.session!;
+    final int initialIndex = _leadershipInitialTabIndex(initialTab);
+    final bool opensUpload = initialIndex == 1;
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
+      initialIndex: initialIndex,
       child: WorkspaceShell(
         currentSection: WorkspaceSection.operations,
         session: session,
-        title: title,
-        subtitle: subtitle,
+        title: opensUpload ? 'Manage Result Upload' : title,
+        subtitle: opensUpload
+            ? 'Select a registered student, choose the subject and exam type, record the mark, then upload it into the live result sheet.'
+            : subtitle,
+        breadcrumbs: <Map<String, String>>[
+          const <String, String>{'label': 'Dashboard', 'route': '/dashboard'},
+          const <String, String>{'label': 'Manage', 'route': '/manage'},
+          if (opensUpload) const <String, String>{'label': 'Result Upload'},
+        ],
         actions: <Widget>[
+          FilledButton.tonalIcon(
+            onPressed: () => context.go('/manage?tab=upload'),
+            icon: const Icon(Icons.cloud_upload_rounded),
+            label: const Text('Result Upload'),
+          ),
           FilledButton.icon(
             onPressed: () => _showTeacherEditorDialog(context, ref),
             icon: const Icon(Icons.person_add_alt_1_rounded),
             label: const Text('Register Teacher'),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => context.go('/all-results'),
+            icon: const Icon(Icons.table_chart_rounded),
+            label: const Text('Uploaded Results'),
           ),
           FilledButton.tonalIcon(
             onPressed: () => context.go('/settings'),
@@ -2000,6 +2031,7 @@ class _LeadershipManagementScreen extends ConsumerWidget {
                             dividerColor: Colors.transparent,
                             tabs: const <Widget>[
                               Tab(text: 'Teacher Registry'),
+                              Tab(text: 'Result Upload'),
                               Tab(text: 'Result Controls'),
                               Tab(text: 'Student Intake'),
                             ],
@@ -2011,6 +2043,9 @@ class _LeadershipManagementScreen extends ConsumerWidget {
                             children: <Widget>[
                               _TeacherRegistryWorkspace(
                                 canRemoveTeachers: canRemoveTeachers,
+                              ),
+                              _LeadershipResultUploadWorkspace(
+                                session: session,
                               ),
                               const _ResultControlWorkspace(),
                               AddStudentWorkspace(overview: overview),
@@ -2027,6 +2062,757 @@ class _LeadershipManagementScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+int _leadershipInitialTabIndex(String value) {
+  switch (value.toLowerCase()) {
+    case 'teacher':
+    case 'teachers':
+    case 'registry':
+      return 0;
+    case 'control':
+    case 'controls':
+    case 'settings':
+      return 2;
+    case 'student':
+    case 'students':
+    case 'intake':
+    case 'student-intake':
+      return 3;
+    case 'result':
+    case 'results':
+    case 'upload':
+    case 'result-upload':
+    default:
+      return 1;
+  }
+}
+
+int _teacherInitialTabIndex(String value) {
+  switch (value.toLowerCase()) {
+    case 'result':
+    case 'results':
+    case 'upload':
+    case 'sheet':
+      return 1;
+    case 'student':
+    case 'students':
+    case 'intake':
+    default:
+      return 0;
+  }
+}
+
+class _LeadershipResultUploadWorkspace extends ConsumerStatefulWidget {
+  const _LeadershipResultUploadWorkspace({required this.session});
+
+  final SessionUser session;
+
+  @override
+  ConsumerState<_LeadershipResultUploadWorkspace> createState() =>
+      _LeadershipResultUploadWorkspaceState();
+}
+
+class _LeadershipResultUploadWorkspaceState
+    extends ConsumerState<_LeadershipResultUploadWorkspace> {
+  late String _selectedClass;
+  String _selectedSubject = kNectaOLevelDefaultSubjectNames.first;
+  ExamType _examType = ExamType.midTerm;
+  String? _selectedStudentId;
+  late final TextEditingController _searchController;
+  late final TextEditingController _scoreController;
+  late final TextEditingController _examLabelController;
+
+  @override
+  void initState() {
+    super.initState();
+    final List<StudentResultRecord> records = ref
+        .read(schoolAdminProvider)
+        .studentResults;
+    _selectedClass = _availableClassNames(records).first;
+    _searchController = TextEditingController();
+    _scoreController = TextEditingController();
+    _examLabelController = TextEditingController(text: _defaultExamLabel);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scoreController.dispose();
+    _examLabelController.dispose();
+    super.dispose();
+  }
+
+  String get _defaultExamLabel {
+    switch (_examType) {
+      case ExamType.midTerm:
+        return 'Mid-Term 1';
+      case ExamType.annual:
+        return 'Annual 1';
+      case ExamType.classExam:
+        return 'Class Exam 1';
+      case ExamType.teacherNamed:
+        return 'Teacher Assessment';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final SchoolAdminState state = ref.watch(schoolAdminProvider);
+    final List<String> classNames = _availableClassNames(state.studentResults);
+    final String effectiveClass = classNames.contains(_selectedClass)
+        ? _selectedClass
+        : classNames.first;
+    if (effectiveClass != _selectedClass) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _selectedClass = effectiveClass;
+          _selectedStudentId = null;
+          _scoreController.clear();
+        });
+      });
+    }
+
+    final List<StudentResultRecord> classStudents =
+        state.studentResults
+            .where(
+              (StudentResultRecord record) =>
+                  record.className == effectiveClass,
+            )
+            .toList()
+          ..sort(compareStudentResultsForRoster);
+    final List<String> subjectNames = _availableSubjects(classStudents);
+    final String effectiveSubject = subjectNames.contains(_selectedSubject)
+        ? _selectedSubject
+        : subjectNames.first;
+    if (effectiveSubject != _selectedSubject) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _selectedSubject = effectiveSubject;
+          _scoreController.clear();
+        });
+      });
+    }
+
+    final String query = _searchController.text.trim().toLowerCase();
+    final List<StudentResultRecord> visibleStudents = classStudents.where((
+      StudentResultRecord record,
+    ) {
+      if (query.isEmpty) {
+        return true;
+      }
+      return record.studentName.toLowerCase().contains(query) ||
+          record.admissionNumber.toLowerCase().contains(query) ||
+          record.className.toLowerCase().contains(query);
+    }).toList();
+
+    final bool selectedStillVisible =
+        _selectedStudentId == null ||
+        classStudents.any(
+          (StudentResultRecord record) => record.id == _selectedStudentId,
+        );
+    if (!selectedStillVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _selectedStudentId = null;
+          _scoreController.clear();
+        });
+      });
+    }
+
+    final int uploadedRows = classStudents.where((StudentResultRecord record) {
+      final SubjectResult? result = _subjectResultFor(record, effectiveSubject);
+      return result != null && result.examMarks.isNotEmpty;
+    }).length;
+    final bool locked = state.resultWindow.editingLocked;
+
+    return ListView(
+      children: <Widget>[
+        const _SectionIntro(
+          title: 'Manage result upload',
+          subtitle:
+              'Record one student subject score at a time from the registered roster. Search or select a row, enter the mark, then upload it into the combined results.',
+        ),
+        const SizedBox(height: 18),
+        _ResultEntrySurface(
+          eyebrow: 'Upload Controls',
+          title: 'Upload controls',
+          subtitle:
+              'Choose the working class, subject, and exam type before selecting a registered student row.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: classNames.map((String className) {
+                  return ChoiceChip(
+                    label: Text(className),
+                    selected: className == effectiveClass,
+                    onSelected: (_) {
+                      setState(() {
+                        _selectedClass = className;
+                        _selectedStudentId = null;
+                        _scoreController.clear();
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 14,
+                runSpacing: 14,
+                children: <Widget>[
+                  SizedBox(
+                    width: 430,
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search_rounded),
+                        labelText: 'Search registered student',
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 280,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: effectiveSubject,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.menu_book_rounded),
+                        labelText: 'Subject',
+                      ),
+                      items: subjectNames
+                          .map(
+                            (String subject) => DropdownMenuItem<String>(
+                              value: subject,
+                              child: Text(subject),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (String? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setState(() {
+                          _selectedSubject = value;
+                          _scoreController.clear();
+                        });
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 230,
+                    child: DropdownButtonFormField<ExamType>(
+                      initialValue: _examType,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.event_note_rounded),
+                        labelText: 'Exam type',
+                      ),
+                      items: ExamType.values
+                          .map(
+                            (ExamType type) => DropdownMenuItem<ExamType>(
+                              value: type,
+                              child: Text(type.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (ExamType? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setState(() {
+                          _examType = value;
+                          _examLabelController.text = _defaultExamLabel;
+                        });
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 250,
+                    child: TextField(
+                      controller: _examLabelController,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.label_rounded),
+                        labelText: 'Exam label',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: <Widget>[
+                  _SummaryPill(
+                    label: '$effectiveClass roster',
+                    tone: const Color(0xFFEAF1FF),
+                  ),
+                  _SummaryPill(
+                    label: '$effectiveSubject upload',
+                    tone: const Color(0xFFE8F7EE),
+                  ),
+                  _SummaryPill(
+                    label:
+                        '${visibleStudents.length}/${classStudents.length} visible',
+                    tone: const Color(0xFFF8FAFC),
+                  ),
+                  _SummaryPill(
+                    label: '$uploadedRows recorded rows',
+                    tone: const Color(0xFFF4EBFF),
+                  ),
+                  if (locked)
+                    const _SummaryPill(
+                      label: 'Editing locked',
+                      tone: Color(0xFFFFEDD5),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        _ResultEntrySurface(
+          eyebrow: 'Registered Student Sheet',
+          title: 'Registered student sheet',
+          subtitle:
+              'Rows come only from registered students. Select a row to enter the mark for the chosen subject and exam.',
+          child: classStudents.isEmpty
+              ? const _ResultEntryEmptyState(
+                  title: 'No registered students in this class',
+                  subtitle:
+                      'Register students first, then this sheet will list them here for result upload.',
+                )
+              : _LeadershipUploadSheet(
+                  records: visibleStudents,
+                  selectedStudentId: _selectedStudentId,
+                  selectedSubject: effectiveSubject,
+                  locked: locked,
+                  scoreController: _scoreController,
+                  onSelect: _selectStudentForUpload,
+                  onUpload: _uploadScoreForStudent,
+                ),
+        ),
+      ],
+    );
+  }
+
+  void _selectStudentForUpload(StudentResultRecord record) {
+    setState(() {
+      _selectedStudentId = record.id;
+      _scoreController.clear();
+    });
+  }
+
+  void _uploadScoreForStudent(StudentResultRecord record) {
+    final SubjectResult? subjectResult = _subjectResultFor(
+      record,
+      _selectedSubject,
+    );
+    if (subjectResult == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${record.studentName} is not registered for $_selectedSubject.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final String label = _examLabelController.text.trim();
+    final String? labelError = FormValidators.validateExamLabel(label);
+    if (labelError != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(labelError)));
+      return;
+    }
+
+    final String scoreText = _scoreController.text.trim();
+    final String? scoreError = FormValidators.validateStandardMarks(scoreText);
+    if (scoreError != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(scoreError)));
+      return;
+    }
+
+    final double score = double.parse(scoreText);
+    final DateTime now = DateTime.now();
+    ref
+        .read(schoolAdminProvider.notifier)
+        .uploadScores(
+          studentId: record.id,
+          subject: subjectResult.subject,
+          examMarks: <ExamMark>[
+            ExamMark(
+              id: 'leadership-${record.id}-${subjectResult.subject}-${now.microsecondsSinceEpoch}',
+              label: label,
+              type: _examType,
+              score: score,
+              component: ExamComponent.overall,
+              teacherId: widget.session.id,
+              teacherName: widget.session.name,
+              examDate: now,
+              uploadedAt: now,
+            ),
+          ],
+        );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${record.studentName} $_selectedSubject score uploaded.',
+        ),
+      ),
+    );
+    setState(() {
+      _selectedStudentId = null;
+      _scoreController.clear();
+    });
+  }
+
+  static List<String> _availableClassNames(List<StudentResultRecord> records) {
+    final Set<String> registeredClasses = records
+        .map((StudentResultRecord record) => record.className)
+        .where((String value) => value.trim().isNotEmpty)
+        .toSet();
+    final List<String> catalogClasses = kClassCatalog
+        .expand((ClassCluster cluster) => cluster.classNames)
+        .toList(growable: false);
+    final List<String> ordered = <String>[
+      for (final String className in catalogClasses)
+        if (registeredClasses.isEmpty || registeredClasses.contains(className))
+          className,
+    ];
+    final List<String> extras =
+        registeredClasses
+            .where((String value) => !catalogClasses.contains(value))
+            .toList()
+          ..sort();
+    return <String>[...ordered, ...extras];
+  }
+
+  static List<String> _availableSubjects(List<StudentResultRecord> records) {
+    final Set<String> registeredSubjects = <String>{
+      for (final StudentResultRecord record in records)
+        for (final SubjectResult result in record.subjectResults)
+          if (result.subject.trim().isNotEmpty) result.subject,
+    };
+    if (registeredSubjects.isEmpty) {
+      return kNectaOLevelDefaultSubjectNames;
+    }
+
+    final List<String> ordered = <String>[
+      for (final String subject in kNectaOLevelSubjectNames)
+        if (registeredSubjects.contains(subject)) subject,
+    ];
+    final List<String> extras =
+        registeredSubjects
+            .where((String value) => !kNectaOLevelSubjectNames.contains(value))
+            .toList()
+          ..sort();
+    return <String>[...ordered, ...extras];
+  }
+
+  static SubjectResult? _subjectResultFor(
+    StudentResultRecord record,
+    String subject,
+  ) {
+    for (final SubjectResult result in record.subjectResults) {
+      if (result.subject == subject) {
+        return result;
+      }
+    }
+    return null;
+  }
+}
+
+class _LeadershipUploadSheet extends StatelessWidget {
+  const _LeadershipUploadSheet({
+    required this.records,
+    required this.selectedStudentId,
+    required this.selectedSubject,
+    required this.locked,
+    required this.scoreController,
+    required this.onSelect,
+    required this.onUpload,
+  });
+
+  final List<StudentResultRecord> records;
+  final String? selectedStudentId;
+  final String selectedSubject;
+  final bool locked;
+  final TextEditingController scoreController;
+  final ValueChanged<StudentResultRecord> onSelect;
+  final ValueChanged<StudentResultRecord> onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    if (records.isEmpty) {
+      return const _ResultEntryEmptyState(
+        title: 'No students match this search',
+        subtitle:
+            'Clear the search field or choose a different class to continue.',
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 1180),
+        child: Column(
+          children: <Widget>[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                children: <Widget>[
+                  _UploadHeaderCell(text: 'Student', width: 330),
+                  _UploadHeaderCell(text: 'Admission', width: 150),
+                  _UploadHeaderCell(text: 'Current Result', width: 260),
+                  _UploadHeaderCell(text: 'Mark', width: 180),
+                  _UploadHeaderCell(text: 'Action', width: 150),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...records.map((StudentResultRecord record) {
+              final bool active = record.id == selectedStudentId;
+              final SubjectResult? result = _subjectResultFor(
+                record,
+                selectedSubject,
+              );
+              final bool canSelect = result != null && !locked;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: active ? const Color(0xFFEAF1FF) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: active
+                          ? const Color(0xFF155EEF)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      _UploadValueCell(
+                        width: 330,
+                        child: Row(
+                          children: <Widget>[
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.person_rounded,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    record.studentName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleSmall,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    record.className,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: const Color(0xFF64748B),
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _UploadValueCell(
+                        width: 150,
+                        child: Text(record.admissionNumber),
+                      ),
+                      _UploadValueCell(
+                        width: 260,
+                        child: _CurrentUploadResult(result: result),
+                      ),
+                      _UploadValueCell(
+                        width: 180,
+                        child: active
+                            ? TextField(
+                                controller: scoreController,
+                                autofocus: true,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                textAlign: TextAlign.center,
+                                decoration: const InputDecoration(
+                                  labelText: '0 - 100',
+                                  isDense: true,
+                                ),
+                              )
+                            : Text(
+                                result == null ? 'Unavailable' : 'Select row',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                      ),
+                      _UploadValueCell(
+                        width: 150,
+                        child: FilledButton(
+                          onPressed: canSelect
+                              ? () =>
+                                    active ? onUpload(record) : onSelect(record)
+                              : null,
+                          child: Text(active ? 'Upload' : 'Select'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static SubjectResult? _subjectResultFor(
+    StudentResultRecord record,
+    String subject,
+  ) {
+    for (final SubjectResult result in record.subjectResults) {
+      if (result.subject == subject) {
+        return result;
+      }
+    }
+    return null;
+  }
+}
+
+class _UploadHeaderCell extends StatelessWidget {
+  const _UploadHeaderCell({required this.text, required this.width});
+
+  final String text;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: Text(
+        text,
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(color: const Color(0xFF0F172A)),
+      ),
+    );
+  }
+}
+
+class _UploadValueCell extends StatelessWidget {
+  const _UploadValueCell({required this.width, required this.child});
+
+  final double width;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(width: width, child: child);
+  }
+}
+
+class _CurrentUploadResult extends StatelessWidget {
+  const _CurrentUploadResult({required this.result});
+
+  final SubjectResult? result;
+
+  @override
+  Widget build(BuildContext context) {
+    if (result == null) {
+      return Text(
+        'Subject not assigned',
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF9A3412)),
+      );
+    }
+
+    if (result!.examMarks.isEmpty) {
+      return Text(
+        'No score uploaded',
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF475569)),
+      );
+    }
+
+    final ExamMark latest = _latestMark(result!.examMarks);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          '${result!.averageScore.toStringAsFixed(1)}% • Grade ${result!.grade}',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${latest.type.label} ${latest.score.toStringAsFixed(1)} • ${formatShortDate(latest.uploadedAt ?? latest.examDate)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)),
+        ),
+      ],
+    );
+  }
+
+  static ExamMark _latestMark(List<ExamMark> marks) {
+    final List<ExamMark> ordered = <ExamMark>[...marks]
+      ..sort((ExamMark first, ExamMark second) {
+        final DateTime firstDate =
+            first.uploadedAt ?? first.examDate ?? DateTime(2000);
+        final DateTime secondDate =
+            second.uploadedAt ?? second.examDate ?? DateTime(2000);
+        return secondDate.compareTo(firstDate);
+      });
+    return ordered.first;
   }
 }
 
