@@ -35,8 +35,11 @@ abstract class ManagementStrings {
   static const String noScoreUploaded = 'No score uploaded';
   static const String selectOrCreateHint =
       'Select or create a student to continue.';
-  // … add more if desired
 }
+
+// ============================================================================
+// MAIN ENTRY POINT
+// ============================================================================
 
 class ManagementScreen extends StatelessWidget {
   const ManagementScreen({super.key, this.initialTab = 'upload'});
@@ -455,7 +458,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
                 final Widget entryColumn = _PanelCard(
                   title: 'Subject result entry',
                   subtitle:
-                      'Each mark is saved with an exam type and label so reports can later filter by mid-term, annual, class exam, or teacher-named exams.',
+                      'Each mark is saved with an exam type and label so reports can later filter by mid‑term, annual, class exam, or teacher‑named exams.',
                   child: record == null
                       ? const Text(ManagementStrings.selectOrCreateHint)
                       : Column(
@@ -639,7 +642,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Row ${index + 1}: Theory mark must be 0-100. $error',
+                  'Row ${index + 1}: Theory mark must be 0‑100. $error',
                 ),
               ),
             );
@@ -653,7 +656,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Row ${index + 1}: Practical mark must be 0-50. $error',
+                  'Row ${index + 1}: Practical mark must be 0‑50. $error',
                 ),
               ),
             );
@@ -667,7 +670,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
         if (error != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Row ${index + 1}: Mark must be 0-100. $error'),
+              content: Text('Row ${index + 1}: Mark must be 0‑100. $error'),
             ),
           );
           return;
@@ -676,7 +679,7 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
 
       examMarks.add(
         ExamMark(
-          id: generateExamMarkId('manual-$currentSubject'),
+          id: generateExamMarkId('manual‑$currentSubject'),
           label: label,
           type: row.type,
           score: score,
@@ -760,13 +763,13 @@ class _ResultEntryWorkspaceState extends ConsumerState<ResultEntryWorkspace> {
   ExamMark _blankExamMark(int index, ExamType type) {
     final int order = _examRows.where((row) => row.type == type).length + 1;
     final String label = switch (type) {
-      ExamType.midTerm => 'Mid-Term $order',
+      ExamType.midTerm => 'Mid‑Term $order',
       ExamType.annual => 'Annual $order',
       ExamType.classExam => 'Class Exam $order',
       ExamType.teacherNamed => 'Teacher Exam $order',
     };
     return ExamMark(
-      id: generateExamMarkId('blank-${type.name}'),
+      id: generateExamMarkId('blank‑${type.name}'),
       label: label,
       type: type,
       score: 0,
@@ -1165,7 +1168,7 @@ class _SubjectEntryBox extends StatelessWidget {
                                     controller: entry.value.labelController,
                                     decoration: const InputDecoration(
                                       labelText: 'Exam label',
-                                      hintText: 'Mid-Term 1 or Special Test',
+                                      hintText: 'Mid‑Term 1 or Special Test',
                                     ),
                                   ),
                                   const SizedBox(height: 12),
@@ -1260,7 +1263,7 @@ class _SubjectEntryBox extends StatelessWidget {
                     FilledButton.tonalIcon(
                       onPressed: () => onAddExam(ExamType.midTerm),
                       icon: const Icon(Icons.event_note_rounded),
-                      label: const Text('Add Mid-Term'),
+                      label: const Text('Add Mid‑Term'),
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () => onAddExam(ExamType.annual),
@@ -1518,7 +1521,7 @@ class TeacherManagementScreen extends ConsumerWidget {
             'Register students, fill subject‑isolated score sheets in rows and columns, and review the combined class result before export.',
         actions: <Widget>[
           FilledButton.icon(
-            onPressed: () => context.go('/result-entry'),
+            onPressed: () => context.go('/result‑entry'),
             icon: const Icon(Icons.border_color_rounded),
             label: const Text('Result Entry Page'),
           ),
@@ -1658,7 +1661,7 @@ class _LeadershipManagementScreen extends ConsumerWidget {
             label: const Text('Register Teacher'),
           ),
           FilledButton.tonalIcon(
-            onPressed: () => context.go('/all-results'),
+            onPressed: () => context.go('/all‑results'),
             icon: const Icon(Icons.table_chart_rounded),
             label: const Text('Uploaded Results'),
           ),
@@ -1749,12 +1752,12 @@ int _leadershipInitialTabIndex(String value) {
     case 'student':
     case 'students':
     case 'intake':
-    case 'student-intake':
+    case 'student‑intake':
       return 3;
     case 'result':
     case 'results':
     case 'upload':
-    case 'result-upload':
+    case 'result‑upload':
     default:
       return 1;
   }
@@ -1776,7 +1779,7 @@ int _teacherInitialTabIndex(String value) {
 }
 
 // ============================================================================
-// LEADERSHIP RESULT UPLOAD WORKSPACE
+// LEADERSHIP RESULT UPLOAD WORKSPACE (MATRIX VIEW)
 // ============================================================================
 
 class _LeadershipResultUploadWorkspace extends ConsumerStatefulWidget {
@@ -1792,12 +1795,12 @@ class _LeadershipResultUploadWorkspace extends ConsumerStatefulWidget {
 class _LeadershipResultUploadWorkspaceState
     extends ConsumerState<_LeadershipResultUploadWorkspace> {
   late String _selectedClass;
-  String _selectedSubject = kNectaOLevelDefaultSubjectNames.first;
   ExamType _examType = ExamType.midTerm;
-  String? _selectedStudentId;
   late final TextEditingController _searchController;
-  late final TextEditingController _scoreController;
   late final TextEditingController _examLabelController;
+
+  // Two‑dimensional controller map: studentId → subject → controller
+  final Map<String, Map<String, TextEditingController>> _scoreControllers = {};
 
   @override
   void initState() {
@@ -1807,22 +1810,22 @@ class _LeadershipResultUploadWorkspaceState
         .studentResults;
     _selectedClass = _availableClassNames(records).first;
     _searchController = TextEditingController();
-    _scoreController = TextEditingController();
     _examLabelController = TextEditingController(text: _defaultExamLabel);
+    _rebuildControllers();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _scoreController.dispose();
     _examLabelController.dispose();
+    _disposeAllControllers();
     super.dispose();
   }
 
   String get _defaultExamLabel {
     switch (_examType) {
       case ExamType.midTerm:
-        return 'Mid-Term 1';
+        return 'Mid‑Term 1';
       case ExamType.annual:
         return 'Annual 1';
       case ExamType.classExam:
@@ -1832,323 +1835,33 @@ class _LeadershipResultUploadWorkspaceState
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final SchoolAdminState state = ref.watch(schoolAdminProvider);
-    final List<String> classNames = _availableClassNames(state.studentResults);
-    final String effectiveClass = classNames.contains(_selectedClass)
-        ? _selectedClass
-        : classNames.first;
-    if (effectiveClass != _selectedClass) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          _selectedClass = effectiveClass;
-          _selectedStudentId = null;
-          _scoreController.clear();
-        });
-      });
+  // ---------- Controller management ----------
+
+  void _disposeAllControllers() {
+    for (final Map<String, TextEditingController> subjectMap
+        in _scoreControllers.values) {
+      for (final TextEditingController c in subjectMap.values) {
+        c.dispose();
+      }
     }
-
-    final List<StudentResultRecord> classStudents =
-        state.studentResults
-            .where(
-              (StudentResultRecord record) =>
-                  record.className == effectiveClass,
-            )
-            .toList()
-          ..sort(compareStudentResultsForRoster);
-    final List<String> subjectNames = _availableSubjects(classStudents);
-    final String effectiveSubject = subjectNames.contains(_selectedSubject)
-        ? _selectedSubject
-        : subjectNames.first;
-    if (effectiveSubject != _selectedSubject) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          _selectedSubject = effectiveSubject;
-          _scoreController.clear();
-        });
-      });
-    }
-
-    final String query = _searchController.text.trim().toLowerCase();
-    final List<StudentResultRecord> visibleStudents = classStudents.where((
-      StudentResultRecord record,
-    ) {
-      if (query.isEmpty) return true;
-      return record.studentName.toLowerCase().contains(query) ||
-          record.admissionNumber.toLowerCase().contains(query) ||
-          record.className.toLowerCase().contains(query);
-    }).toList();
-
-    final bool selectedStillVisible =
-        _selectedStudentId == null ||
-        classStudents.any(
-          (StudentResultRecord record) => record.id == _selectedStudentId,
-        );
-    if (!selectedStillVisible) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          _selectedStudentId = null;
-          _scoreController.clear();
-        });
-      });
-    }
-
-    final int uploadedRows = classStudents.where((record) {
-      final result = _subjectResultFor(record, effectiveSubject);
-      return result != null && result.examMarks.isNotEmpty;
-    }).length;
-    final bool locked = state.resultWindow.editingLocked;
-
-    return ListView(
-      children: <Widget>[
-        const _SectionIntro(
-          title: 'Manage result upload',
-          subtitle:
-              'Record one student subject score at a time from the registered roster. Search or select a row, enter the mark, then upload it into the combined results.',
-        ),
-        const SizedBox(height: 18),
-        _ResultEntrySurface(
-          eyebrow: 'Upload Controls',
-          title: 'Upload controls',
-          subtitle:
-              'Choose the working class, subject, and exam type before selecting a registered student row.',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: classNames.map((String className) {
-                  return ChoiceChip(
-                    label: Text(className),
-                    selected: className == effectiveClass,
-                    onSelected: (_) {
-                      setState(() {
-                        _selectedClass = className;
-                        _selectedStudentId = null;
-                        _scoreController.clear();
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 18),
-              Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                children: <Widget>[
-                  SizedBox(
-                    width: 430,
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search_rounded),
-                        labelText: 'Search registered student',
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 280,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: effectiveSubject,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.menu_book_rounded),
-                        labelText: 'Subject',
-                      ),
-                      items: subjectNames
-                          .map(
-                            (String s) => DropdownMenuItem<String>(
-                              value: s,
-                              child: Text(s),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (String? value) {
-                        if (value == null) return;
-                        setState(() {
-                          _selectedSubject = value;
-                          _scoreController.clear();
-                        });
-                      },
-                    ),
-                  ),
-                  SizedBox(
-                    width: 230,
-                    child: DropdownButtonFormField<ExamType>(
-                      initialValue: _examType,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.event_note_rounded),
-                        labelText: 'Exam type',
-                      ),
-                      items: ExamType.values
-                          .map(
-                            (ExamType type) => DropdownMenuItem<ExamType>(
-                              value: type,
-                              child: Text(type.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (ExamType? value) {
-                        if (value == null) return;
-                        setState(() {
-                          _examType = value;
-                          _examLabelController.text = _defaultExamLabel;
-                        });
-                      },
-                    ),
-                  ),
-                  SizedBox(
-                    width: 250,
-                    child: TextField(
-                      controller: _examLabelController,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.label_rounded),
-                        labelText: 'Exam label',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: <Widget>[
-                  _SummaryPill(
-                    label: '$effectiveClass roster',
-                    tone: const Color(0xFFEAF1FF),
-                  ),
-                  _SummaryPill(
-                    label: '$effectiveSubject upload',
-                    tone: const Color(0xFFE8F7EE),
-                  ),
-                  _SummaryPill(
-                    label:
-                        '${visibleStudents.length}/${classStudents.length} visible',
-                    tone: const Color(0xFFF8FAFC),
-                  ),
-                  _SummaryPill(
-                    label: '$uploadedRows recorded rows',
-                    tone: const Color(0xFFF4EBFF),
-                  ),
-                  if (locked)
-                    const _SummaryPill(
-                      label: 'Editing locked',
-                      tone: Color(0xFFFFEDD5),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        _ResultEntrySurface(
-          eyebrow: 'Registered Student Sheet',
-          title: 'Registered student sheet',
-          subtitle:
-              'Rows come only from registered students. Select a row to enter the mark for the chosen subject and exam.',
-          child: classStudents.isEmpty
-              ? const _ResultEntryEmptyState(
-                  title: 'No registered students in this class',
-                  subtitle:
-                      'Register students first, then this sheet will list them here for result upload.',
-                )
-              : _LeadershipUploadSheet(
-                  records: visibleStudents,
-                  selectedStudentId: _selectedStudentId,
-                  selectedSubject: effectiveSubject,
-                  locked: locked,
-                  scoreController: _scoreController,
-                  onSelect: _selectStudentForUpload,
-                  onUpload: _uploadScoreForStudent,
-                ),
-        ),
-      ],
-    );
+    _scoreControllers.clear();
   }
 
-  void _selectStudentForUpload(StudentResultRecord record) {
-    setState(() {
-      _selectedStudentId = record.id;
-      _scoreController.clear();
-    });
+  /// Rebuild entire controller map based on the current class and its registered subjects.
+  void _rebuildControllers() {
+    _disposeAllControllers();
+    final List<StudentResultRecord> classStudents = _classStudents();
+    for (final StudentResultRecord record in classStudents) {
+      final Map<String, TextEditingController> subjectMap =
+          <String, TextEditingController>{};
+      for (final SubjectResult result in record.subjectResults) {
+        subjectMap[result.subject] = TextEditingController();
+      }
+      _scoreControllers[record.id] = subjectMap;
+    }
   }
 
-  void _uploadScoreForStudent(StudentResultRecord record) {
-    final SubjectResult? subjectResult = _subjectResultFor(
-      record,
-      _selectedSubject,
-    );
-    if (subjectResult == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${record.studentName} is not registered for $_selectedSubject.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    final String label = _examLabelController.text.trim();
-    final String? labelError = FormValidators.validateExamLabel(label);
-    if (labelError != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(labelError)));
-      return;
-    }
-
-    final String scoreText = _scoreController.text.trim();
-    final String? scoreError = FormValidators.validateStandardMarks(scoreText);
-    if (scoreError != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(scoreError)));
-      return;
-    }
-
-    final double score = double.parse(scoreText);
-    final DateTime now = DateTime.now();
-    ref
-        .read(schoolAdminProvider.notifier)
-        .uploadScores(
-          studentId: record.id,
-          subject: subjectResult.subject,
-          examMarks: <ExamMark>[
-            ExamMark(
-              id: generateExamMarkId(
-                'leadership-${record.id}-${subjectResult.subject}',
-              ),
-              label: label,
-              type: _examType,
-              score: score,
-              component: ExamComponent.overall,
-              teacherId: widget.session.id,
-              teacherName: widget.session.name,
-              examDate: now,
-              uploadedAt: now,
-            ),
-          ],
-        );
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${record.studentName} $_selectedSubject score uploaded.',
-        ),
-      ),
-    );
-    setState(() {
-      _selectedStudentId = null;
-      _scoreController.clear();
-    });
-  }
+  // ---------- Data helpers ----------
 
   static List<String> _availableClassNames(List<StudentResultRecord> records) {
     final Set<String> registeredClasses = records
@@ -2169,62 +1882,316 @@ class _LeadershipResultUploadWorkspaceState
     return [...ordered, ...extras];
   }
 
-  static List<String> _availableSubjects(List<StudentResultRecord> records) {
-    final Set<String> registeredSubjects = {
-      for (final record in records)
-        for (final result in record.subjectResults)
-          if (result.subject.trim().isNotEmpty) result.subject,
-    };
-    if (registeredSubjects.isEmpty) return kNectaOLevelDefaultSubjectNames;
+  List<StudentResultRecord> _classStudents() {
+    final state = ref.read(schoolAdminProvider);
+    return state.studentResults
+        .where((r) => r.className == _selectedClass)
+        .toList()
+      ..sort(compareStudentResultsForRoster);
+  }
 
-    final List<String> ordered = [
-      for (final subject in kNectaOLevelSubjectNames)
-        if (registeredSubjects.contains(subject)) subject,
-    ];
+  /// The subjects that appear in at least one student of the current class.
+  List<String> _availableSubjectsForClass(List<StudentResultRecord> students) {
+    final Set<String> subjects = {};
+    for (final s in students) {
+      for (final r in s.subjectResults) {
+        subjects.add(r.subject);
+      }
+    }
+    if (subjects.isEmpty) return kNectaOLevelDefaultSubjectNames;
+    // sort by default order, then any extras
+    final List<String> ordered = [];
+    for (final subj in kNectaOLevelSubjectNames) {
+      if (subjects.contains(subj)) ordered.add(subj);
+    }
     final List<String> extras =
-        registeredSubjects
-            .where((v) => !kNectaOLevelSubjectNames.contains(v))
-            .toList()
+        subjects.where((s) => !kNectaOLevelSubjectNames.contains(s)).toList()
           ..sort();
     return [...ordered, ...extras];
   }
 
-  static SubjectResult? _subjectResultFor(
-    StudentResultRecord record,
-    String subject,
-  ) {
-    for (final result in record.subjectResults) {
-      if (result.subject == subject) return result;
+  // ---------- Bulk upload ----------
+
+  void _uploadAllScores() {
+    final String label = _examLabelController.text.trim();
+    final String? labelError = FormValidators.validateExamLabel(label);
+    if (labelError != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(labelError)));
+      return;
     }
-    return null;
+
+    final SchoolAdminController controller = ref.read(
+      schoolAdminProvider.notifier,
+    );
+    final DateTime now = DateTime.now();
+    int uploaded = 0;
+
+    for (final MapEntry<String, Map<String, TextEditingController>> studentEntry
+        in _scoreControllers.entries) {
+      final String studentId = studentEntry.key;
+      for (final MapEntry<String, TextEditingController> subjectEntry
+          in studentEntry.value.entries) {
+        final String subject = subjectEntry.key;
+        final TextEditingController ctrl = subjectEntry.value;
+        final String text = ctrl.text.trim();
+        if (text.isEmpty) continue;
+
+        final double? score = double.tryParse(text);
+        if (score == null || score < 0 || score > 100) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Invalid score for $subject – $studentId')),
+          );
+          return;
+        }
+
+        controller.uploadScores(
+          studentId: studentId,
+          subject: subject,
+          examMarks: <ExamMark>[
+            ExamMark(
+              id: generateExamMarkId('leadership‑$studentId‑$subject'),
+              label: label,
+              type: _examType,
+              score: score,
+              component: ExamComponent.overall,
+              teacherId: widget.session.id,
+              teacherName: widget.session.name,
+              examDate: now,
+              uploadedAt: now,
+            ),
+          ],
+        );
+        uploaded++;
+      }
+    }
+
+    if (uploaded == 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No scores entered.')));
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$uploaded scores uploaded successfully.')),
+    );
+
+    // Clear all controllers to start fresh
+    for (final Map<String, TextEditingController> subjectMap
+        in _scoreControllers.values) {
+      for (final TextEditingController c in subjectMap.values) {
+        c.clear();
+      }
+    }
   }
-}
 
-// ---------------------------------------------------------------------------
-// Leadership upload sheet (table inside the leadership workspace)
-// ---------------------------------------------------------------------------
-class _LeadershipUploadSheet extends StatelessWidget {
-  const _LeadershipUploadSheet({
-    required this.records,
-    required this.selectedStudentId,
-    required this.selectedSubject,
-    required this.locked,
-    required this.scoreController,
-    required this.onSelect,
-    required this.onUpload,
-  });
-
-  final List<StudentResultRecord> records;
-  final String? selectedStudentId;
-  final String selectedSubject;
-  final bool locked;
-  final TextEditingController scoreController;
-  final ValueChanged<StudentResultRecord> onSelect;
-  final ValueChanged<StudentResultRecord> onUpload;
+  // ---------- Build ----------
 
   @override
   Widget build(BuildContext context) {
-    if (records.isEmpty) {
+    final SchoolAdminState state = ref.watch(schoolAdminProvider);
+    final List<String> classNames = _availableClassNames(state.studentResults);
+    final String effectiveClass = classNames.contains(_selectedClass)
+        ? _selectedClass
+        : classNames.first;
+    if (effectiveClass != _selectedClass) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _selectedClass = effectiveClass;
+          _rebuildControllers();
+        });
+      });
+    }
+
+    final List<StudentResultRecord> classStudents = _classStudents();
+    final List<String> allSubjects = _availableSubjectsForClass(classStudents);
+
+    final String query = _searchController.text.trim().toLowerCase();
+    final List<StudentResultRecord> visibleStudents = classStudents.where((r) {
+      if (query.isEmpty) return true;
+      return r.studentName.toLowerCase().contains(query) ||
+          r.admissionNumber.toLowerCase().contains(query) ||
+          r.className.toLowerCase().contains(query);
+    }).toList();
+
+    final bool locked = state.resultWindow.editingLocked;
+
+    return ListView(
+      children: <Widget>[
+        const _SectionIntro(
+          title: 'Bulk subject marks entry',
+          subtitle:
+              'Choose a class, pick the exam type and label, then fill marks for all subjects in the matrix. One click uploads every entered score.',
+        ),
+        const SizedBox(height: 18),
+        _ResultEntrySurface(
+          eyebrow: 'Class & Exam Setup',
+          title: 'Select class and exam',
+          subtitle:
+              'All subjects that appear in this class will be shown as columns. Fill cells only for the students you want to record.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: classNames.map((String className) {
+                  return ChoiceChip(
+                    label: Text(className),
+                    selected: className == effectiveClass,
+                    onSelected: (_) {
+                      setState(() {
+                        _selectedClass = className;
+                        _rebuildControllers();
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 14,
+                runSpacing: 14,
+                children: <Widget>[
+                  SizedBox(
+                    width: 430,
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search_rounded),
+                        labelText: 'Search students',
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 200,
+                    child: DropdownButtonFormField<ExamType>(
+                      initialValue: _examType,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.event_note_rounded),
+                        labelText: 'Exam type',
+                      ),
+                      items: ExamType.values
+                          .map(
+                            (t) => DropdownMenuItem<ExamType>(
+                              value: t,
+                              child: Text(t.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (ExamType? value) {
+                        if (value == null) return;
+                        setState(() {
+                          _examType = value;
+                          _examLabelController.text = _defaultExamLabel;
+                        });
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 280,
+                    child: TextField(
+                      controller: _examLabelController,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.label_rounded),
+                        labelText: 'Exam label',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: <Widget>[
+                  _SummaryPill(
+                    label: '$effectiveClass',
+                    tone: const Color(0xFFEAF1FF),
+                  ),
+                  _SummaryPill(
+                    label: '${allSubjects.length} subjects',
+                    tone: const Color(0xFFE8F7EE),
+                  ),
+                  _SummaryPill(
+                    label:
+                        '${visibleStudents.length}/${classStudents.length} students',
+                    tone: const Color(0xFFF8FAFC),
+                  ),
+                  if (locked)
+                    const _SummaryPill(
+                      label: 'Editing locked',
+                      tone: Color(0xFFFFEDD5),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        _ResultEntrySurface(
+          eyebrow: 'Score Matrix',
+          title: 'Enter marks for all subjects',
+          subtitle:
+              'Each column is a subject. Only registered students have an editable cell. Fill the cells you need and click Upload All.',
+          child: classStudents.isEmpty
+              ? const _ResultEntryEmptyState(
+                  title: 'No registered students in this class',
+                  subtitle:
+                      'Register students first, then this sheet will list them here for result upload.',
+                )
+              : Column(
+                  children: [
+                    _LeadershipUploadMatrix(
+                      records: visibleStudents,
+                      subjects: allSubjects,
+                      scoreControllers: _scoreControllers,
+                    ),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.icon(
+                        onPressed: locked ? null : _uploadAllScores,
+                        icon: const Icon(Icons.cloud_upload_rounded),
+                        label: const Text('Upload All Marks'),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==============================
+// LEADERSHIP UPLOAD MATRIX (MULTI‑SUBJECT)
+// ==============================
+
+class _LeadershipUploadMatrix extends StatefulWidget {
+  const _LeadershipUploadMatrix({
+    required this.records,
+    required this.subjects,
+    required this.scoreControllers,
+  });
+
+  final List<StudentResultRecord> records;
+  final List<String> subjects;
+  final Map<String, Map<String, TextEditingController>> scoreControllers;
+
+  @override
+  State<_LeadershipUploadMatrix> createState() =>
+      _LeadershipUploadMatrixState();
+}
+
+class _LeadershipUploadMatrixState extends State<_LeadershipUploadMatrix> {
+  @override
+  Widget build(BuildContext context) {
+    if (widget.records.isEmpty) {
       return const _ResultEntryEmptyState(
         title: 'No students match this search',
         subtitle:
@@ -2232,139 +2199,130 @@ class _LeadershipUploadSheet extends StatelessWidget {
       );
     }
 
+    // Dynamic minimum width to accommodate all subject columns
+    final double minWidth = 250 + 130 + widget.subjects.length * 120.0;
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 1180),
+        constraints: BoxConstraints(minWidth: minWidth),
         child: Column(
-          children: <Widget>[
+          children: [
+            // ----- Header row -----
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: const Color(0xFF0F172A),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Row(
-                children: <Widget>[
-                  _UploadHeaderCell(text: 'Student', width: 330),
-                  _UploadHeaderCell(text: 'Admission', width: 150),
-                  _UploadHeaderCell(text: 'Current Result', width: 260),
-                  _UploadHeaderCell(text: 'Mark', width: 180),
-                  _UploadHeaderCell(text: 'Action', width: 150),
+              child: Row(
+                children: [
+                  const SizedBox(width: 44), // row number spacer
+                  const _UploadHeaderCell(text: 'Student', width: 230),
+                  const _UploadHeaderCell(text: 'Admission', width: 120),
+                  ...widget.subjects.map(
+                    (subj) => _UploadHeaderCell(text: subj, width: 120),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 10),
-            ...records.map((StudentResultRecord record) {
-              final bool active = record.id == selectedStudentId;
-              final SubjectResult? result = _subjectResultFor(
-                record,
-                selectedSubject,
-              );
-              final bool canSelect = result != null && !locked;
+            // ----- Student rows -----
+            ...widget.records.asMap().entries.map((entry) {
+              final int index = entry.key;
+              final StudentResultRecord record = entry.value;
+              final Map<String, TextEditingController>? subjectMap =
+                  widget.scoreControllers[record.id];
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 14,
-                  ),
+                child: Container(
                   decoration: BoxDecoration(
-                    color: active ? const Color(0xFFEAF1FF) : Colors.white,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: active
-                          ? const Color(0xFF155EEF)
-                          : const Color(0xFFE2E8F0),
-                    ),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
                   ),
                   child: Row(
-                    children: <Widget>[
-                      _UploadValueCell(
-                        width: 330,
-                        child: Row(
-                          children: <Widget>[
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Icon(
-                                Icons.person_rounded,
-                                color: Color(0xFF475569),
-                              ),
+                    children: [
+                      SizedBox(
+                        width: 44,
+                        child: Text(
+                          '${index + 1}',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 230,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              record.studentName,
+                              style: Theme.of(context).textTheme.titleSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    record.studentName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleSmall,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    record.className,
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: const Color(0xFF64748B),
-                                        ),
-                                  ),
-                                ],
-                              ),
+                            const SizedBox(height: 4),
+                            Text(
+                              record.className,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: const Color(0xFF64748B)),
                             ),
                           ],
                         ),
                       ),
-                      _UploadValueCell(
-                        width: 150,
-                        child: Text(record.admissionNumber),
-                      ),
-                      _UploadValueCell(
-                        width: 260,
-                        child: _CurrentUploadResult(result: result),
-                      ),
-                      _UploadValueCell(
-                        width: 180,
-                        child: active
-                            ? TextField(
-                                controller: scoreController,
-                                autofocus: true,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
+                      SizedBox(width: 120, child: Text(record.admissionNumber)),
+                      // Subject cells
+                      ...widget.subjects.map((subject) {
+                        final bool hasSubject =
+                            subjectMap != null &&
+                            subjectMap.containsKey(subject);
+                        final TextEditingController? ctrl = hasSubject
+                            ? subjectMap![subject]
+                            : null;
+
+                        return SizedBox(
+                          width: 120,
+                          child: ctrl != null
+                              ? Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  child: TextField(
+                                    controller: ctrl,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    textAlign: TextAlign.center,
+                                    decoration: const InputDecoration(
+                                      hintText: '0‑100',
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 12,
+                                          ),
                                     ),
-                                textAlign: TextAlign.center,
-                                decoration: const InputDecoration(
-                                  labelText: '0 - 100',
-                                  isDense: true,
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    '—',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: const Color(0xFF9CA3AF),
+                                        ),
+                                  ),
                                 ),
-                              )
-                            : Text(
-                                result == null
-                                    ? ManagementStrings.unavailableText
-                                    : ManagementStrings.selectRowHint,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                      ),
-                      _UploadValueCell(
-                        width: 150,
-                        child: FilledButton(
-                          onPressed: canSelect
-                              ? () =>
-                                    active ? onUpload(record) : onSelect(record)
-                              : null,
-                          child: Text(active ? 'Upload' : 'Select'),
-                        ),
-                      ),
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -2375,17 +2333,11 @@ class _LeadershipUploadSheet extends StatelessWidget {
       ),
     );
   }
-
-  static SubjectResult? _subjectResultFor(
-    StudentResultRecord record,
-    String subject,
-  ) {
-    for (final result in record.subjectResults) {
-      if (result.subject == subject) return result;
-    }
-    return null;
-  }
 }
+
+// ============================================================================
+// UPLOAD MATRIX HEADER CELL
+// ============================================================================
 
 class _UploadHeaderCell extends StatelessWidget {
   const _UploadHeaderCell({required this.text, required this.width});
@@ -2399,80 +2351,14 @@ class _UploadHeaderCell extends StatelessWidget {
       width: width,
       child: Text(
         text,
-        style: Theme.of(
-          context,
-        ).textTheme.labelLarge?.copyWith(color: const Color(0xFF0F172A)),
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
-  }
-}
-
-class _UploadValueCell extends StatelessWidget {
-  const _UploadValueCell({required this.width, required this.child});
-
-  final double width;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(width: width, child: child);
-  }
-}
-
-class _CurrentUploadResult extends StatelessWidget {
-  const _CurrentUploadResult({required this.result});
-
-  final SubjectResult? result;
-
-  @override
-  Widget build(BuildContext context) {
-    if (result == null) {
-      return Text(
-        ManagementStrings.studentNotAssignedToSubject,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF9A3412)),
-      );
-    }
-
-    if (result!.examMarks.isEmpty) {
-      return Text(
-        ManagementStrings.noScoreUploaded,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF475569)),
-      );
-    }
-
-    final ExamMark latest = _latestMark(result!.examMarks);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          '${result!.averageScore.toStringAsFixed(1)}% • Grade ${result!.grade}',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${latest.type.label} ${latest.score.toStringAsFixed(1)} • ${formatShortDate(latest.uploadedAt ?? latest.examDate)}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)),
-        ),
-      ],
-    );
-  }
-
-  static ExamMark _latestMark(List<ExamMark> marks) {
-    final List<ExamMark> ordered = [...marks]
-      ..sort((a, b) {
-        final aDate = a.uploadedAt ?? a.examDate ?? DateTime(2000);
-        final bDate = b.uploadedAt ?? b.examDate ?? DateTime(2000);
-        return bDate.compareTo(aDate);
-      });
-    return ordered.first;
   }
 }
 
@@ -2779,7 +2665,7 @@ class _SubjectResultEntryWorkspaceState
   String get _defaultExamLabel {
     switch (_examType) {
       case ExamType.midTerm:
-        return 'Mid-Term 1';
+        return 'Mid‑Term 1';
       case ExamType.annual:
         return 'Annual 1';
       case ExamType.classExam:
@@ -3272,7 +3158,7 @@ class _SubjectResultEntryWorkspaceState
   double? _combinedScore(StudentResultRecord record, SchoolSettings settings) {
     final theory = _parsedScore(_scoreControllers[record.id]);
     if (!_usesPracticals) return theory?.clamp(0, 100);
-    final practical = _parsedScore(_practicalControllers[record.id]);
+    final double? practical = _parsedScore(_practicalControllers[record.id]);
     if (theory == null && practical == null) return null;
     if (theory == null) return null;
     if (practical == null && !settings.autoZeroMissingPracticals) return null;
@@ -3308,7 +3194,8 @@ class _SubjectResultEntryWorkspaceState
         .whereType<double>()
         .toList();
     if (scores.isEmpty) return 0;
-    return scores.fold<double>(0, (sum, v) => sum + v) / scores.length;
+    return scores.fold<double>(0, (double sum, double v) => sum + v) /
+        scores.length;
   }
 
   StudentResultRecord? _topEnteredStudent(
@@ -3369,7 +3256,8 @@ class _SubjectResultEntryWorkspaceState
       final marks = entry.value;
       final lead = marks.first;
       final score =
-          marks.fold<double>(0, (sum, m) => sum + m.score) / marks.length;
+          marks.fold<double>(0, (double sum, ExamMark m) => sum + m.score) /
+          marks.length;
       return _StudentExamSessionSummary(
         sessionKey: entry.key,
         label: lead.label,
@@ -4999,7 +4887,10 @@ class _SubjectEntryClassAnalysis extends StatelessWidget {
     }
 
     final double classAverage =
-        records.fold<double>(0, (sum, r) => sum + r.averageScore) /
+        records.fold<double>(
+          0,
+          (double sum, StudentResultRecord r) => sum + r.averageScore,
+        ) /
         records.length;
     final ranked = [...records]
       ..sort((a, b) => b.averageScore.compareTo(a.averageScore));
@@ -5276,7 +5167,7 @@ String _sheetSessionKey({
 }
 
 // ============================================================================
-// CONSTANTS (moved from top of original for reference)
+// CONSTANTS
 // ============================================================================
 
 @immutable
