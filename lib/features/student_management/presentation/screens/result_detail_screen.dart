@@ -949,67 +949,20 @@ class ResultDetailScreen extends ConsumerWidget {
       ],
       sections: <ReportExportSection>[
         ReportExportSection(
-          title: 'Subject Breakdown',
-          note:
-              'Summary of results by subject with overall averages and grades.',
-          headers: const <String>[
-            'Subject',
-            'Exam Records',
-            'Latest Upload',
-            'Average',
-            'Grade',
-            'Points',
+          title: 'Subject Marks Matrix',
+          note: 'Average marks and grades by subject.',
+          headers: <String>[
+            'Student',
+            ...filtered.subjectResults.map((SubjectResult s) => s.subject),
           ],
-          rows: filtered.subjectResults.map((SubjectResult subject) {
-            return <Object?>[
-              subject.subject,
-              formatExamMarkList(subject.examMarks),
-              formatDateTimeStamp(
-                subject.examMarks
-                    .map((ExamMark item) => item.uploadedAt)
-                    .whereType<DateTime>()
-                    .fold<DateTime?>(
-                      null,
-                      (DateTime? latest, DateTime item) =>
-                          latest == null || item.isAfter(latest)
-                          ? item
-                          : latest,
-                    ),
-              ),
-              subject.averageScore.toStringAsFixed(1),
-              subject.grade,
-              subject.gradePoint,
-            ];
-          }).toList(),
-        ),
-        // Detailed exam records section
-        ReportExportSection(
-          title: 'Detailed Exam Records',
-          note: 'Complete breakdown of all exam marks by subject and type.',
-          headers: const <String>[
-            'Subject',
-            'Exam Label',
-            'Type',
-            'Score',
-            'Component',
-            'Exam Date',
+          rows: <List<Object?>>[
+            <Object?>[
+              '${record.studentName} (${record.admissionNumber})',
+              ...filtered.subjectResults.map((SubjectResult subject) {
+                return '${subject.averageScore.toStringAsFixed(1)} (${subject.grade})';
+              }),
+            ],
           ],
-          rows: filtered.subjectResults.expand<List<Object?>>((
-            SubjectResult subject,
-          ) {
-            return subject.examMarks.map<List<Object?>>((ExamMark mark) {
-              return <Object?>[
-                subject.subject,
-                mark.label,
-                mark.type.label,
-                mark.score.toStringAsFixed(1),
-                mark.component == ExamComponent.overall
-                    ? 'Overall'
-                    : mark.component.label,
-                formatShortDate(mark.examDate),
-              ];
-            }).toList();
-          }).toList(),
         ),
       ],
     );
