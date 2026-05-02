@@ -49,8 +49,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
-    _schoolController = TextEditingController(text: 'Summit View College');
-    _districtController = TextEditingController(text: 'Jabu District');
+    _schoolController = TextEditingController(text: 'Tunduru Secondary School');
+    _districtController = TextEditingController(text: 'Tunduru District');
   }
 
   @override

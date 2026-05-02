@@ -647,7 +647,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
       id: 'managed-student-$nextIndex',
       admissionNumber: admissionNumber?.trim().isNotEmpty == true
           ? admissionNumber!.trim()
-          : 'SVC-${nextIndex.toString().padLeft(3, '0')}',
+          : 'S4217/-${nextIndex.toString().padLeft(3, '0')}',
       studentName: studentName,
       className: className,
       gender: gender,
@@ -1250,8 +1250,8 @@ double _average(Iterable<double> values) {
 SchoolAdminState _initialAdminState() {
   return SchoolAdminState(
     session: null,
-    schoolName: 'Summit View College',
-    districtName: 'Jabu District',
+    schoolName: 'Tunduru Secondary School',
+    districtName: 'Tunduru District',
     headmasterName: 'Head Grace Njeri',
     teachers: const <TeacherAccount>[],
     resultWindow: ResultWindowSettings(

@@ -4,7 +4,7 @@ add column if not exists gender text not null default '';
 with missing_admission_numbers as (
   select
     id,
-    'SVC-MIG-' || id::text as generated_admission_number
+    'S4217/-MIG-' || id::text as generated_admission_number
   from public.students
   where admission_number is null
     or btrim(admission_number) = ''
