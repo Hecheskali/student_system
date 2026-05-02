@@ -950,7 +950,8 @@ class ResultDetailScreen extends ConsumerWidget {
       sections: <ReportExportSection>[
         ReportExportSection(
           title: 'Subject Breakdown',
-          note: 'Available as Excel or PDF from the student result page.',
+          note:
+              'Summary of results by subject with overall averages and grades.',
           headers: const <String>[
             'Subject',
             'Exam Records',
@@ -979,6 +980,35 @@ class ResultDetailScreen extends ConsumerWidget {
               subject.grade,
               subject.gradePoint,
             ];
+          }).toList(),
+        ),
+        // Detailed exam records section
+        ReportExportSection(
+          title: 'Detailed Exam Records',
+          note: 'Complete breakdown of all exam marks by subject and type.',
+          headers: const <String>[
+            'Subject',
+            'Exam Label',
+            'Type',
+            'Score',
+            'Component',
+            'Exam Date',
+          ],
+          rows: filtered.subjectResults.expand<List<Object?>>((
+            SubjectResult subject,
+          ) {
+            return subject.examMarks.map<List<Object?>>((ExamMark mark) {
+              return <Object?>[
+                subject.subject,
+                mark.label,
+                mark.type.label,
+                mark.score.toStringAsFixed(1),
+                mark.component == ExamComponent.overall
+                    ? 'Overall'
+                    : mark.component.label,
+                formatShortDate(mark.examDate),
+              ];
+            }).toList();
           }).toList(),
         ),
       ],

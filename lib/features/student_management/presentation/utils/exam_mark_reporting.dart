@@ -125,16 +125,18 @@ String formatExamMarkList(List<ExamMark> marks) {
   if (marks.isEmpty) {
     return 'No marks';
   }
-  return marks
-      .map(
-        (ExamMark mark) =>
-            '${mark.label} (${mark.type.label})'
-            '${mark.component == ExamComponent.overall ? '' : ' ${mark.component.label}'}'
-            ': ${mark.score.toStringAsFixed(1)}'
-            ' | Exam ${formatShortDate(mark.examDate)}'
-            ' | Uploaded ${formatShortDate(mark.uploadedAt)}',
-      )
-      .join('\n');
+  // For reports, show a clean summary by exam type instead of all details
+  final Map<String, int> typeCount = {};
+  for (final ExamMark mark in marks) {
+    final String key = mark.type.label;
+    typeCount[key] = (typeCount[key] ?? 0) + 1;
+  }
+
+  final List<String> summaries = typeCount.entries
+      .map((MapEntry<String, int> e) => '${e.value}x ${e.key}')
+      .toList();
+
+  return summaries.join(', ');
 }
 
 double? getAverageScoreForExamType(SubjectResult subject, ExamType type) {
