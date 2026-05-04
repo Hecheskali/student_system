@@ -4,6 +4,7 @@ import '../../features/student_management/domain/entities/education_entities.dar
 import '../../features/student_management/presentation/screens/analytics_screen.dart';
 import '../../features/student_management/presentation/screens/all_results_screen.dart';
 import '../../features/student_management/presentation/screens/dashboard_screen.dart';
+import '../../features/student_management/presentation/screens/headmaster_login_screen.dart';
 import '../../features/student_management/presentation/screens/hierarchy_explorer_screen.dart';
 import '../../features/student_management/presentation/screens/login_screen.dart';
 import '../../features/student_management/presentation/screens/management_screen.dart';
@@ -12,12 +13,14 @@ import '../../features/student_management/presentation/screens/records_screen.da
 import '../../features/student_management/presentation/screens/result_detail_screen.dart';
 import '../../features/student_management/presentation/screens/result_entry_screen.dart';
 import '../../features/student_management/presentation/screens/results_screen.dart';
+import '../../features/student_management/presentation/screens/role_selection_screen.dart';
 import '../../features/student_management/presentation/screens/search_screen.dart';
 import '../../features/student_management/presentation/screens/settings_screen.dart';
 import '../../features/student_management/presentation/screens/signup_screen.dart';
 import '../../features/student_management/presentation/screens/splash_screen.dart';
 import '../../features/student_management/presentation/screens/student_detail_screen.dart';
 import '../../features/student_management/presentation/screens/student_intake_screen.dart';
+import '../../features/student_management/presentation/screens/teacher_login_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -25,6 +28,18 @@ class AppRouter {
     routes: <RouteBase>[
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/role-selection',
+        builder: (context, state) => const RoleSelectionScreen(),
+      ),
+      GoRoute(
+        path: '/headmaster-login',
+        builder: (context, state) => const HeadmasterLoginScreen(),
+      ),
+      GoRoute(
+        path: '/teacher-login',
+        builder: (context, state) => const TeacherLoginScreen(),
+      ),
       GoRoute(
         path: '/signup',
         builder: (context, state) {
