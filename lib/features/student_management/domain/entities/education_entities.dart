@@ -370,6 +370,7 @@ class TeacherAccount {
     this.assignedClasses = const <String>[],
     this.canRegisterStudents = true,
     this.canDownloadResults = true,
+    this.isActive = true,
   });
 
   final String id;
@@ -383,6 +384,7 @@ class TeacherAccount {
   final List<String> assignedClasses;
   final bool canRegisterStudents;
   final bool canDownloadResults;
+  final bool isActive;
 
   List<String> get effectiveSubjects {
     final List<String> values = <String>[subject, ...subjects];
@@ -410,6 +412,7 @@ class TeacherAccount {
     List<String>? assignedClasses,
     bool? canRegisterStudents,
     bool? canDownloadResults,
+    bool? isActive,
   }) {
     return TeacherAccount(
       id: id ?? this.id,
@@ -423,6 +426,7 @@ class TeacherAccount {
       assignedClasses: assignedClasses ?? this.assignedClasses,
       canRegisterStudents: canRegisterStudents ?? this.canRegisterStudents,
       canDownloadResults: canDownloadResults ?? this.canDownloadResults,
+      isActive: isActive ?? this.isActive,
     );
   }
 }
@@ -620,6 +624,10 @@ class StudentResultRecord {
     required this.studentName,
     required this.className,
     this.gender = StudentGender.female,
+    this.guardianName = '',
+    this.guardianPhone = '',
+    this.registeredAt,
+    this.isActive = true,
     required this.averageScore,
     required this.interExamAverage,
     required this.division,
@@ -635,6 +643,10 @@ class StudentResultRecord {
   final String studentName;
   final String className;
   final StudentGender gender;
+  final String guardianName;
+  final String guardianPhone;
+  final DateTime? registeredAt;
+  final bool isActive;
   final double averageScore;
   final double interExamAverage;
   final String division;
@@ -661,6 +673,11 @@ class StudentResultRecord {
     String? studentName,
     String? className,
     StudentGender? gender,
+    String? guardianName,
+    String? guardianPhone,
+    DateTime? registeredAt,
+    bool clearRegisteredAt = false,
+    bool? isActive,
     double? averageScore,
     double? interExamAverage,
     String? division,
@@ -676,6 +693,12 @@ class StudentResultRecord {
       studentName: studentName ?? this.studentName,
       className: className ?? this.className,
       gender: gender ?? this.gender,
+      guardianName: guardianName ?? this.guardianName,
+      guardianPhone: guardianPhone ?? this.guardianPhone,
+      registeredAt: clearRegisteredAt
+          ? null
+          : (registeredAt ?? this.registeredAt),
+      isActive: isActive ?? this.isActive,
       averageScore: averageScore ?? this.averageScore,
       interExamAverage: interExamAverage ?? this.interExamAverage,
       division: division ?? this.division,

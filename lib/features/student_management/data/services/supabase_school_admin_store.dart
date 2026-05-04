@@ -315,7 +315,7 @@ class SupabaseSchoolAdminStore {
       'assigned_classes': teacher.assignedClasses,
       'school_name': schoolName,
       'district_name': districtName,
-      'profile': const <String, dynamic>{},
+      'profile': <String, dynamic>{'is_active': teacher.isActive},
     };
     if (existing != null) {
       payload['id'] = existing['id'];
@@ -840,6 +840,7 @@ class SupabaseSchoolAdminStore {
   }
 
   TeacherAccount _teacherFromRow(Map<String, dynamic> row) {
+    final Map<String, dynamic> profile = _mapValue(row['profile']);
     return TeacherAccount(
       id: _stringValue(row, 'id'),
       name: _stringValue(row, 'name'),
@@ -860,6 +861,7 @@ class SupabaseSchoolAdminStore {
         'can_download_results',
         fallback: true,
       ),
+      isActive: _boolValue(profile, 'is_active', fallback: true),
     );
   }
 
@@ -891,6 +893,12 @@ class SupabaseSchoolAdminStore {
       gender: _studentGenderFromString(
         _stringValue(row, 'gender', fallback: _stringValue(profile, 'gender')),
       ),
+      guardianName: _stringValue(profile, 'guardian_name'),
+      guardianPhone: _stringValue(profile, 'guardian_phone'),
+      registeredAt:
+          _nullableDateTime(profile['registered_at']) ??
+          _nullableDateTime(row['created_at']),
+      isActive: _boolValue(profile, 'is_active', fallback: true),
       averageScore: _doubleValue(row, 'average_score'),
       interExamAverage: _doubleValue(
         profile,
@@ -1040,6 +1048,10 @@ Map<String, dynamic> _studentProfilePayload(StudentResultRecord record) {
     'division': record.division,
     'division_points': record.divisionPoints,
     'gender': record.gender.name,
+    'guardian_name': record.guardianName,
+    'guardian_phone': record.guardianPhone,
+    'registered_at': record.registeredAt?.toIso8601String(),
+    'is_active': record.isActive,
     'inter_exam_average': record.interExamAverage,
     'subject_results': record.subjectResults.map(_subjectPayload).toList(),
     'performance_trend': record.performanceTrend

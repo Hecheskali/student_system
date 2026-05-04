@@ -1,10 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:student_system/main.dart';
 
 void main() {
   testWidgets('splash screen loads', (WidgetTester tester) async {
-    await tester.pumpWidget(const StudentSystemApp());
+    await tester.pumpWidget(const ProviderScope(child: StudentSystemApp()));
 
     expect(find.text('Student Command Center'), findsOneWidget);
     expect(

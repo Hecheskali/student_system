@@ -5,11 +5,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/education_entities.dart';
 import '../providers/student_management_providers.dart';
+import 'headmaster_panel_screen.dart';
 import '../widgets/motion_widgets.dart';
 import '../widgets/workspace_shell.dart';
 
 class DashboardScreen extends ConsumerWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.initialPanel});
+
+  final String? initialPanel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -47,6 +50,10 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
       );
+    }
+
+    if (session.role == UserRole.headOfSchool) {
+      return HeadmasterPanelScreen(initialPanel: initialPanel);
     }
 
     final bool canUploadScores =

@@ -1521,7 +1521,7 @@ class TeacherManagementScreen extends ConsumerWidget {
             'Register students, fill subject‑isolated score sheets in rows and columns, and review the combined class result before export.',
         actions: <Widget>[
           FilledButton.icon(
-            onPressed: () => context.go('/result‑entry'),
+            onPressed: () => context.go('/result-entry'),
             icon: const Icon(Icons.border_color_rounded),
             label: const Text('Result Entry Page'),
           ),
@@ -1661,7 +1661,7 @@ class _LeadershipManagementScreen extends ConsumerWidget {
             label: const Text('Register Teacher'),
           ),
           FilledButton.tonalIcon(
-            onPressed: () => context.go('/all‑results'),
+            onPressed: () => context.go('/all-results'),
             icon: const Icon(Icons.table_chart_rounded),
             label: const Text('Uploaded Results'),
           ),
@@ -1752,12 +1752,12 @@ int _leadershipInitialTabIndex(String value) {
     case 'student':
     case 'students':
     case 'intake':
-    case 'student‑intake':
+    case 'student-intake':
       return 3;
     case 'result':
     case 'results':
     case 'upload':
-    case 'result‑upload':
+    case 'result-upload':
     default:
       return 1;
   }
@@ -2110,7 +2110,7 @@ class _LeadershipResultUploadWorkspaceState
                 runSpacing: 10,
                 children: <Widget>[
                   _SummaryPill(
-                    label: '$effectiveClass',
+                    label: effectiveClass,
                     tone: const Color(0xFFEAF1FF),
                   ),
                   _SummaryPill(
@@ -2282,7 +2282,7 @@ class _LeadershipUploadMatrixState extends State<_LeadershipUploadMatrix> {
                             subjectMap != null &&
                             subjectMap.containsKey(subject);
                         final TextEditingController? ctrl = hasSubject
-                            ? subjectMap![subject]
+                            ? subjectMap[subject]
                             : null;
 
                         return SizedBox(
@@ -2302,11 +2302,10 @@ class _LeadershipUploadMatrixState extends State<_LeadershipUploadMatrix> {
                                     decoration: const InputDecoration(
                                       hintText: '0‑100',
                                       isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 12,
-                                          ),
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 12,
+                                      ),
                                     ),
                                   ),
                                 )
@@ -2335,10 +2334,6 @@ class _LeadershipUploadMatrixState extends State<_LeadershipUploadMatrix> {
   }
 }
 
-// ============================================================================
-// UPLOAD MATRIX HEADER CELL
-// ============================================================================
-
 class _UploadHeaderCell extends StatelessWidget {
   const _UploadHeaderCell({required this.text, required this.width});
 
@@ -2361,10 +2356,6 @@ class _UploadHeaderCell extends StatelessWidget {
     );
   }
 }
-
-// ============================================================================
-// TEACHER REGISTRY & RESULT CONTROLS
-// ============================================================================
 
 class _TeacherRegistryWorkspace extends ConsumerWidget {
   const _TeacherRegistryWorkspace({required this.canRemoveTeachers});
@@ -2464,10 +2455,19 @@ class _TeacherRegistryWorkspace extends ConsumerWidget {
                       ),
                       if (canRemoveTeachers)
                         OutlinedButton.icon(
-                          onPressed: () =>
-                              _showRemoveTeacherDialog(context, ref, teacher),
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          label: const Text('Remove Teacher'),
+                          onPressed: teacher.isActive
+                              ? () => _showRemoveTeacherDialog(
+                                  context,
+                                  ref,
+                                  teacher,
+                                )
+                              : null,
+                          icon: const Icon(Icons.person_off_rounded),
+                          label: Text(
+                            teacher.isActive
+                                ? 'Deactivate Teacher'
+                                : 'Teacher Deactivated',
+                          ),
                         ),
                     ],
                   ),
@@ -3180,8 +3180,9 @@ class _SubjectResultEntryWorkspaceState
     if (theory == null) return _EntryRowStatus.pending;
     if (!_usesPracticals) return _EntryRowStatus.ready;
     final practical = _parsedScore(_practicalControllers[record.id]);
-    if (practical != null || settings.autoZeroMissingPracticals)
+    if (practical != null || settings.autoZeroMissingPracticals) {
       return _EntryRowStatus.ready;
+    }
     return _EntryRowStatus.partial;
   }
 
@@ -4910,8 +4911,9 @@ class _SubjectEntryClassAnalysis extends StatelessWidget {
         )
         .where((sr) => sr.subject == subject)
         .fold<SubjectResult?>(null, (current, next) {
-          if (current == null || next.averageScore > current.averageScore)
+          if (current == null || next.averageScore > current.averageScore) {
             return next;
+          }
           return current;
         });
     final divisionSpread = <String, int>{
@@ -5131,9 +5133,9 @@ Future<void> _showRemoveTeacherDialog(
     context: context,
     builder: (dialogContext) {
       return AlertDialog(
-        title: const Text('Remove Teacher'),
+        title: const Text('Deactivate Teacher'),
         content: Text(
-          'Remove ${teacher.name} from the registry? Their subject assignment will disappear from teacher login immediately.',
+          'Deactivate ${teacher.name}? Their record will stay in history, but upload, edit, registration, and download permissions will be turned off.',
         ),
         actions: <Widget>[
           TextButton(
@@ -5142,10 +5144,12 @@ Future<void> _showRemoveTeacherDialog(
           ),
           FilledButton(
             onPressed: () {
-              ref.read(schoolAdminProvider.notifier).removeTeacher(teacher.id);
+              ref
+                  .read(schoolAdminProvider.notifier)
+                  .deactivateTeacher(teacher.id);
               Navigator.of(dialogContext).pop();
             },
-            child: const Text('Remove'),
+            child: const Text('Deactivate'),
           ),
         ],
       );

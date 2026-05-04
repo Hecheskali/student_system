@@ -820,13 +820,13 @@ ReportExportSection _buildStudentSubjectMatrix(
     ];
 
     for (final String subject in sortedSubjects) {
-      final SubjectResult? result = record.subjectResults.firstWhere(
+      final SubjectResult result = record.subjectResults.firstWhere(
         (SubjectResult r) => r.subject == subject,
         orElse: () => SubjectResult(
           subject: subject,
           averageScore: 0,
           grade: '-',
-          gradePoint: '-',
+          gradePoint: 0,
           examMarks: const <ExamMark>[],
         ),
       );

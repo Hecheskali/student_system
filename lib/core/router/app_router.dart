@@ -40,7 +40,8 @@ class AppRouter {
       ),
       GoRoute(
         path: '/dashboard',
-        builder: (context, state) => const DashboardScreen(),
+        builder: (context, state) =>
+            DashboardScreen(initialPanel: state.uri.queryParameters['panel']),
       ),
       GoRoute(
         path: '/student-intake',

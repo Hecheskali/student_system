@@ -439,20 +439,42 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
   }
 
   void removeTeacher(String teacherId) {
+    deactivateTeacher(teacherId);
+  }
+
+  void deactivateTeacher(String teacherId) {
     state = state.copyWith(
-      teachers: state.teachers
-          .where((TeacherAccount teacher) => teacher.id != teacherId)
-          .toList(),
+      teachers: state.teachers.map((TeacherAccount teacher) {
+        if (teacher.id != teacherId) {
+          return teacher;
+        }
+        return teacher.copyWith(
+          isActive: false,
+          canUploadResults: false,
+          canEditResults: false,
+          canRegisterStudents: false,
+          canDownloadResults: false,
+        );
+      }).toList(),
     );
 
     if (state.session?.id == teacherId) {
       logout();
     }
 
-    if (_store != null) {
-      final SupabaseSchoolAdminStore store = _store;
-      _persist(() => store.deleteTeacher(teacherId));
-    }
+    _persistTeacherById(teacherId);
+  }
+
+  void setTeacherActive(String teacherId, bool active) {
+    state = state.copyWith(
+      teachers: state.teachers.map((TeacherAccount teacher) {
+        if (teacher.id != teacherId) {
+          return teacher;
+        }
+        return teacher.copyWith(isActive: active);
+      }).toList(),
+    );
+    _persistTeacherById(teacherId);
   }
 
   void toggleTeacherUpload(String teacherId) {
@@ -637,6 +659,8 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     List<String> subjects = const <String>[],
     String? admissionNumber,
     double? attendanceRate,
+    String guardianName = '',
+    String guardianPhone = '',
   }) async {
     final int nextIndex = state.studentResults.length + 1;
     final List<SubjectResult> subjectResults = _buildDefaultSubjects(
@@ -647,10 +671,14 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
       id: 'managed-student-$nextIndex',
       admissionNumber: admissionNumber?.trim().isNotEmpty == true
           ? admissionNumber!.trim()
-          : 'S4217/-${nextIndex.toString().padLeft(3, '0')}',
+          : _nextAdmissionNumber(state.studentResults),
       studentName: studentName,
       className: className,
       gender: gender,
+      guardianName: guardianName,
+      guardianPhone: guardianPhone,
+      registeredAt: DateTime.now(),
+      isActive: true,
       attendanceRate:
           (attendanceRate ?? (90 + (nextIndex % 6).toDouble())).clamp(0, 100)
               as double,
@@ -681,6 +709,39 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     state = state.copyWith(
       studentResults: <StudentResultRecord>[...state.studentResults, record],
     );
+  }
+
+  void updateStudentRecord(StudentResultRecord record) {
+    state = state.copyWith(
+      studentResults: state.studentResults
+          .map((StudentResultRecord item) {
+            return item.id == record.id ? record : item;
+          })
+          .toList(growable: false),
+    );
+    _persistStudentRecord(record);
+  }
+
+  void setStudentActive(String studentId, bool active) {
+    StudentResultRecord? updatedRecord;
+    state = state.copyWith(
+      studentResults: state.studentResults
+          .map((StudentResultRecord record) {
+            if (record.id != studentId) {
+              return record;
+            }
+            updatedRecord = record.copyWith(isActive: active);
+            return updatedRecord!;
+          })
+          .toList(growable: false),
+    );
+    if (updatedRecord != null) {
+      _persistStudentRecord(updatedRecord!);
+    }
+  }
+
+  void deactivateStudent(String studentId) {
+    setStudentActive(studentId, false);
   }
 
   void uploadScores({
@@ -971,10 +1032,13 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
 
 SchoolOverview _buildOverview(SchoolAdminState state) {
   final List<StudentResultRecord> results =
-      <StudentResultRecord>[...state.studentResults]..sort(
-        (StudentResultRecord a, StudentResultRecord b) =>
-            b.averageScore.compareTo(a.averageScore),
-      );
+      state.studentResults
+          .where((StudentResultRecord record) => record.isActive)
+          .toList()
+        ..sort(
+          (StudentResultRecord a, StudentResultRecord b) =>
+              b.averageScore.compareTo(a.averageScore),
+        );
 
   final Map<String, int> divisionDistribution = <String, int>{
     'Division I': 0,
@@ -993,7 +1057,9 @@ SchoolOverview _buildOverview(SchoolAdminState state) {
     schoolName: state.schoolName,
     districtName: state.districtName,
     headmasterName: state.headmasterName,
-    totalTeachers: state.teachers.length,
+    totalTeachers: state.teachers
+        .where((TeacherAccount teacher) => teacher.isActive)
+        .length,
     totalStudents: results.length,
     totalClasses: results
         .map((StudentResultRecord item) => item.className)
@@ -1051,7 +1117,9 @@ List<SearchResultItem> _buildSearchIndex({
     );
   }
 
-  for (final TeacherAccount teacher in state.teachers) {
+  for (final TeacherAccount teacher in state.teachers.where(
+    (TeacherAccount teacher) => teacher.isActive,
+  )) {
     items.add(
       SearchResultItem(
         id: teacher.id,
@@ -1319,6 +1387,10 @@ StudentResultRecord _composeStudentRecord({
   required String studentName,
   required String className,
   StudentGender gender = StudentGender.female,
+  String guardianName = '',
+  String guardianPhone = '',
+  DateTime? registeredAt,
+  bool isActive = true,
   required double attendanceRate,
   required List<SubjectResult> subjectResults,
   required List<ScorePoint> performanceTrend,
@@ -1338,6 +1410,10 @@ StudentResultRecord _composeStudentRecord({
     studentName: studentName,
     className: className,
     gender: gender,
+    guardianName: guardianName,
+    guardianPhone: guardianPhone,
+    registeredAt: registeredAt,
+    isActive: isActive,
     averageScore: averageScore,
     interExamAverage: interExamAverage,
     division: divisionSummary.division,
@@ -1359,6 +1435,10 @@ StudentResultRecord _recomposeRecord(
     studentName: record.studentName,
     className: record.className,
     gender: record.gender,
+    guardianName: record.guardianName,
+    guardianPhone: record.guardianPhone,
+    registeredAt: record.registeredAt,
+    isActive: record.isActive,
     attendanceRate: record.attendanceRate,
     subjectResults: subjectResults,
     performanceTrend: <ScorePoint>[
@@ -1371,6 +1451,23 @@ StudentResultRecord _recomposeRecord(
       ),
     ],
   );
+}
+
+String _nextAdmissionNumber(List<StudentResultRecord> records) {
+  int maxIndex = 0;
+  for (final StudentResultRecord record in records) {
+    final Iterable<RegExpMatch> matches = RegExp(
+      r'(\d+)',
+    ).allMatches(record.admissionNumber);
+    if (matches.isEmpty) {
+      continue;
+    }
+    final int? value = int.tryParse(matches.last.group(1) ?? '');
+    if (value != null && value > maxIndex) {
+      maxIndex = value;
+    }
+  }
+  return 'S4217/-${(maxIndex + 1).toString().padLeft(3, '0')}';
 }
 
 RiskLevel _riskFor(double averageScore, double attendanceRate) {
