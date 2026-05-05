@@ -196,9 +196,10 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     await _hydrateFromSupabase();
   }
 
-  Future<void> signInWithEmailAndPassword({
+  Future<SessionUser> signInWithEmailAndPassword({
     required String email,
     required String password,
+    UserRole? expectedRole,
   }) async {
     if (_store == null) {
       throw StateError('Supabase is not configured for this app.');
@@ -219,9 +220,37 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
 
     await _hydrateFromSupabase();
 
-    if (session == null && state.session == null) {
+    final SessionUser? signedInSession = state.session ?? session;
+    if (signedInSession == null) {
       throw StateError('Login succeeded but no school profile was found.');
     }
+
+    if (expectedRole != null && signedInSession.role != expectedRole) {
+      await store.signOut();
+      state = state.copyWith(clearSession: true);
+      throw StateError(_roleMismatchMessage(expectedRole));
+    }
+
+    if (expectedRole == UserRole.teacher) {
+      final TeacherAccount? teacher = _teacherById(
+        state.teachers,
+        signedInSession.id,
+      );
+      if (teacher == null) {
+        await store.signOut();
+        state = state.copyWith(clearSession: true);
+        throw StateError(
+          'Teacher login is not linked to a teacher record. Ask the headmaster to recreate or relink this account.',
+        );
+      }
+      if (!teacher.isActive) {
+        await store.signOut();
+        state = state.copyWith(clearSession: true);
+        throw StateError('This teacher account is deactivated.');
+      }
+    }
+
+    return signedInSession;
   }
 
   void loginAs(UserRole role, {String? teacherId}) {
@@ -390,6 +419,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     required String email,
     required List<String> subjects,
     required List<String> assignedClasses,
+    String? password,
   }) async {
     final List<String> normalizedSubjects = _normalizedAssignments(
       subjects,
@@ -423,13 +453,27 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     final SupabaseSchoolAdminStore store = _store;
 
     try {
-      final TeacherAccount savedTeacher = await store.saveTeacher(
-        teacher: teacher,
-        schoolName: state.schoolName,
-        districtName: state.districtName,
-      );
+      final String initialPassword = password?.trim() ?? '';
+      final TeacherAccount savedTeacher = initialPassword.isEmpty
+          ? await store.saveTeacher(
+              teacher: teacher,
+              schoolName: state.schoolName,
+              districtName: state.districtName,
+            )
+          : await store.createTeacherAccount(
+              teacher: teacher,
+              password: initialPassword,
+              schoolName: state.schoolName,
+              districtName: state.districtName,
+            );
       state = state.copyWith(
-        teachers: <TeacherAccount>[...state.teachers, savedTeacher],
+        teachers: <TeacherAccount>[
+          for (final TeacherAccount current in state.teachers)
+            if (current.id != savedTeacher.id &&
+                current.email.toLowerCase() != savedTeacher.email.toLowerCase())
+              current,
+          savedTeacher,
+        ],
       );
     } on Object catch (error, stackTrace) {
       debugPrint('Saving teacher failed: $error');
@@ -1511,6 +1555,17 @@ TeacherAccount? _teacherById(List<TeacherAccount> teachers, String teacherId) {
     }
   }
   return null;
+}
+
+String _roleMismatchMessage(UserRole expectedRole) {
+  switch (expectedRole) {
+    case UserRole.teacher:
+      return 'This is not a teacher account. Use the headmaster login for administrator accounts.';
+    case UserRole.academicMaster:
+      return 'This is not an academic master account.';
+    case UserRole.headOfSchool:
+      return 'Only headmasters can access this portal. Please use the teacher login for teacher accounts.';
+  }
 }
 
 List<String> _normalizedAssignments(

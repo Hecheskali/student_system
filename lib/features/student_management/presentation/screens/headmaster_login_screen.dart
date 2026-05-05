@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/entities/education_entities.dart';
 import '../providers/student_management_providers.dart';
 
 /// Headmaster Login Screen - Specialized login for school administrators
@@ -46,13 +47,14 @@ class _HeadmasterLoginScreenState extends ConsumerState<HeadmasterLoginScreen> {
   Widget build(BuildContext context) {
     final bool hasLiveBackend = ref.watch(supabaseServiceProvider) != null;
     final session = ref.watch(schoolAdminProvider).session;
+    final bool hasHeadmasterSession = session?.role == UserRole.headOfSchool;
 
-    if (session == null) {
+    if (!hasHeadmasterSession) {
       _hasScheduledRedirect = false;
     }
 
     // Auto-redirect if already logged in
-    if (session != null && !_hasScheduledRedirect) {
+    if (hasHeadmasterSession && !_hasScheduledRedirect) {
       _hasScheduledRedirect = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -181,7 +183,11 @@ class _HeadmasterLoginScreenState extends ConsumerState<HeadmasterLoginScreen> {
     try {
       await ref
           .read(schoolAdminProvider.notifier)
-          .signInWithEmailAndPassword(email: email, password: password);
+          .signInWithEmailAndPassword(
+            email: email,
+            password: password,
+            expectedRole: UserRole.headOfSchool,
+          );
       if (!mounted) {
         return;
       }
@@ -218,7 +224,8 @@ class _HeadmasterLoginScreenState extends ConsumerState<HeadmasterLoginScreen> {
     }
 
     if (lower.contains('not authorized') ||
-        lower.contains('not a headmaster')) {
+        lower.contains('not a headmaster') ||
+        lower.contains('only headmasters')) {
       return 'Only headmasters can access this portal. Please use the teacher login.';
     }
 

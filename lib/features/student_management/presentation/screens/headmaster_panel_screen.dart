@@ -668,13 +668,13 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
         _TwoColumn(
           left: _StudentRankBoard(
             title: 'Top Students',
-            students: top.take(8).toList(),
+            students: top.take(10).toList(),
             approveIds: panel.approvedResultIds,
             onApprove: _approveResult,
           ),
           right: _StudentRankBoard(
             title: 'Weak Students',
-            students: weak.take(8).toList(),
+            students: weak.take(10).toList(),
             approveIds: panel.approvedResultIds,
             onApprove: _approveResult,
           ),
@@ -1326,6 +1326,7 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
     final TextEditingController emailController = TextEditingController(
       text: teacher?.email ?? '',
     );
+    final TextEditingController passwordController = TextEditingController();
     final Set<String> selectedSubjects = <String>{
       ...?teacher?.effectiveSubjects,
     };
@@ -1362,6 +1363,16 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
                         controller: emailController,
                         decoration: const InputDecoration(labelText: 'Email'),
                       ),
+                      if (!editing) ...<Widget>[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Initial password',
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       Text(
                         'Subjects',
@@ -1429,8 +1440,14 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
                 FilledButton(
                   onPressed: () {
                     final String name = nameController.text.trim();
-                    final String email = emailController.text.trim();
+                    final String email = emailController.text
+                        .trim()
+                        .toLowerCase();
+                    final String password = passwordController.text.trim();
                     if (name.isEmpty || !email.contains('@')) {
+                      return;
+                    }
+                    if (!editing && password.length < 6) {
                       return;
                     }
                     final SchoolAdminController controller = ref.read(
@@ -1454,6 +1471,7 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
                         email: email,
                         subjects: selectedSubjects.toList(),
                         assignedClasses: selectedClasses.toList(),
+                        password: password,
                       );
                       _audit(
                         action: 'Added teacher',
@@ -1474,6 +1492,7 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
 
     nameController.dispose();
     emailController.dispose();
+    passwordController.dispose();
   }
 
   Future<void> _showCreateClassDialog() async {

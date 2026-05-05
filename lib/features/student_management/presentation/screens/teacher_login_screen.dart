@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/entities/education_entities.dart';
 import '../providers/student_management_providers.dart';
 
 /// Teacher Login Screen - Specialized login for teachers
@@ -45,13 +46,14 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
   Widget build(BuildContext context) {
     final bool hasLiveBackend = ref.watch(supabaseServiceProvider) != null;
     final session = ref.watch(schoolAdminProvider).session;
+    final bool hasTeacherSession = session?.role == UserRole.teacher;
 
-    if (session == null) {
+    if (!hasTeacherSession) {
       _hasScheduledRedirect = false;
     }
 
     // Auto-redirect if already logged in
-    if (session != null && !_hasScheduledRedirect) {
+    if (hasTeacherSession && !_hasScheduledRedirect) {
       _hasScheduledRedirect = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -180,7 +182,11 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
     try {
       await ref
           .read(schoolAdminProvider.notifier)
-          .signInWithEmailAndPassword(email: email, password: password);
+          .signInWithEmailAndPassword(
+            email: email,
+            password: password,
+            expectedRole: UserRole.teacher,
+          );
       if (!mounted) {
         return;
       }
@@ -218,6 +224,18 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen> {
 
     if (lower.contains('no account found')) {
       return 'Your account has not been created yet. Ask your headmaster to create an account for you.';
+    }
+
+    if (lower.contains('not a teacher account')) {
+      return 'This is not a teacher account. Use the headmaster login for administrator accounts.';
+    }
+
+    if (lower.contains('not linked to a teacher record')) {
+      return 'This login is not linked to a teacher record. Ask your headmaster to recreate the account.';
+    }
+
+    if (lower.contains('deactivated')) {
+      return 'This teacher account is deactivated.';
     }
 
     if (normalized.isEmpty) {

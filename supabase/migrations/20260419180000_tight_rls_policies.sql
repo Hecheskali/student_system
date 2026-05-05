@@ -3,13 +3,6 @@
 -- Tight security based on exact school/district role matrix
 --
 
--- Role Hierarchy:
--- District Level:
---   - district_admin: Can view/manage all schools, classes, students, results in district
---   - head_of_school: Can view/manage own school's data
---   - academic_master: Can view/manage grades for assigned subjects/classes
---   - teacher: Can view/upload grades for own class/subject
-
 -- =============================================================================
 -- HELPER FUNCTIONS
 -- =============================================================================
@@ -51,8 +44,13 @@ stable
 security definer
 set search_path = public
 as $$
-  select id from public.schools 
-  where name = (select school_name from public.users where id = auth.uid())
+  select id
+  from public.schools
+  where name = (
+    select school_name
+    from public.users
+    where id = auth.uid()
+  )
   limit 1
 $$;
 
@@ -63,8 +61,13 @@ stable
 security definer
 set search_path = public
 as $$
-  select id from public.districts 
-  where name = (select district_name from public.users where id = auth.uid())
+  select id
+  from public.districts
+  where name = (
+    select district_name
+    from public.users
+    where id = auth.uid()
+  )
   limit 1
 $$;
 
@@ -116,13 +119,15 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.classes c
-    where c.id = class_id
-    and c.name = any(
-      select (jsonb_array_elements(assigned_classes)->>'name')
-      from public.users
-      where id = auth.uid()
-    )
+    select 1
+    from public.classes c
+    where c.id = $1
+      and c.name in (
+        select item ->> 'name'
+        from public.users u,
+        jsonb_array_elements(u.assigned_classes) as item
+        where u.id = auth.uid()
+      )
   )
 $$;
 
@@ -134,15 +139,97 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.users
-    where id = auth.uid()
-    and subject_text = any(
-      select jsonb_array_elements(subjects) ->> 'name'
-      from public.users
-      where id = auth.uid()
-    )
+    select 1
+    from public.users u,
+    jsonb_array_elements(u.subjects) as item
+    where u.id = auth.uid()
+      and subject_text = item ->> 'name'
   )
 $$;
+
+-- =============================================================================
+-- DROP OLD/DUPLICATE POLICIES
+-- =============================================================================
+
+drop policy if exists "district_admin_see_all_districts" on public.districts;
+drop policy if exists "head_of_school_see_own_district" on public.districts;
+drop policy if exists "academic_master_see_own_district" on public.districts;
+drop policy if exists "teacher_see_own_district" on public.districts;
+drop policy if exists "district_admin_manage_districts" on public.districts;
+
+drop policy if exists "district_admin_see_schools" on public.schools;
+drop policy if exists "head_of_school_see_own_school" on public.schools;
+drop policy if exists "academic_master_see_own_school" on public.schools;
+drop policy if exists "teacher_see_own_school" on public.schools;
+drop policy if exists "district_admin_manage_schools" on public.schools;
+drop policy if exists "head_of_school_manage_own_school" on public.schools;
+
+drop policy if exists "district_admin_see_classes" on public.classes;
+drop policy if exists "head_of_school_see_classes" on public.classes;
+drop policy if exists "academic_master_see_classes" on public.classes;
+drop policy if exists "teacher_see_assigned_classes" on public.classes;
+drop policy if exists "head_of_school_manage_classes" on public.classes;
+
+drop policy if exists "district_admin_see_students" on public.students;
+drop policy if exists "head_of_school_see_students" on public.students;
+drop policy if exists "academic_master_see_students" on public.students;
+drop policy if exists "teacher_see_students" on public.students;
+drop policy if exists "head_of_school_manage_students" on public.students;
+
+drop policy if exists "district_admin_see_results" on public.results;
+drop policy if exists "head_of_school_see_results" on public.results;
+drop policy if exists "academic_master_see_results" on public.results;
+drop policy if exists "teacher_see_results" on public.results;
+drop policy if exists "academic_master_insert_results" on public.results;
+drop policy if exists "academic_master_update_results" on public.results;
+drop policy if exists "teacher_insert_results" on public.results;
+
+drop policy if exists "district_admin_see_exams" on public.exams;
+drop policy if exists "head_of_school_see_exams" on public.exams;
+drop policy if exists "teacher_see_exams" on public.exams;
+drop policy if exists "head_of_school_create_exams" on public.exams;
+drop policy if exists "teacher_manage_own_exams" on public.exams;
+
+drop policy if exists "see_teachers_in_school" on public.teachers;
+drop policy if exists "head_of_school_manage_teachers" on public.teachers;
+
+drop policy if exists "users_see_themselves" on public.users;
+drop policy if exists "head_of_school_see_school_users" on public.users;
+drop policy if exists "users_update_themselves" on public.users;
+drop policy if exists "district_admin_update_users" on public.users;
+
+drop policy if exists "authenticated_read_settings" on public.settings;
+drop policy if exists "admin_manage_settings" on public.settings;
+
+-- Policies from previous migration, drop to avoid conflicts/duplicates
+
+drop policy if exists "authenticated read districts" on public.districts;
+drop policy if exists "admin manage districts" on public.districts;
+
+drop policy if exists "authenticated read schools" on public.schools;
+drop policy if exists "admin manage schools" on public.schools;
+
+drop policy if exists "authenticated read classes" on public.classes;
+drop policy if exists "admin manage classes" on public.classes;
+
+drop policy if exists "users read own profile" on public.users;
+drop policy if exists "users update own profile" on public.users;
+drop policy if exists "admin insert users" on public.users;
+
+drop policy if exists "teachers read within assigned organization" on public.teachers;
+drop policy if exists "teachers manage within assigned organization" on public.teachers;
+
+drop policy if exists "students read within scope" on public.students;
+drop policy if exists "students manage within school" on public.students;
+
+drop policy if exists "exams read within scope" on public.exams;
+drop policy if exists "exams manage within scope" on public.exams;
+
+drop policy if exists "results read within scope" on public.results;
+drop policy if exists "results manage within school" on public.results;
+
+drop policy if exists "authenticated read settings" on public.settings;
+drop policy if exists "admin manage settings" on public.settings;
 
 -- =============================================================================
 -- DISTRICTS RLS POLICIES
@@ -150,45 +237,45 @@ $$;
 
 alter table public.districts enable row level security;
 
--- District admins see all districts
-create policy "district_admin_see_all_districts" on public.districts
+create policy "district_admin_see_all_districts"
+on public.districts
 for select
 to authenticated
-using (is_district_admin());
+using (public.is_district_admin());
 
--- Head of school sees only own district
-create policy "head_of_school_see_own_district" on public.districts
-for select
-to authenticated
-using (
-  is_head_of_school()
-  and name = public.get_user_district()
-);
-
--- Academic masters see only own district
-create policy "academic_master_see_own_district" on public.districts
+create policy "head_of_school_see_own_district"
+on public.districts
 for select
 to authenticated
 using (
-  is_academic_master()
+  public.is_head_of_school()
   and name = public.get_user_district()
 );
 
--- Teachers see only own district
-create policy "teacher_see_own_district" on public.districts
+create policy "academic_master_see_own_district"
+on public.districts
 for select
 to authenticated
 using (
-  is_teacher()
+  public.is_academic_master()
   and name = public.get_user_district()
 );
 
--- Only district admins can modify districts
-create policy "district_admin_manage_districts" on public.districts
+create policy "teacher_see_own_district"
+on public.districts
+for select
+to authenticated
+using (
+  public.is_teacher()
+  and name = public.get_user_district()
+);
+
+create policy "district_admin_manage_districts"
+on public.districts
 for all
 to authenticated
-using (is_district_admin())
-with check (is_district_admin());
+using (public.is_district_admin())
+with check (public.is_district_admin());
 
 -- =============================================================================
 -- SCHOOLS RLS POLICIES
@@ -196,65 +283,65 @@ with check (is_district_admin());
 
 alter table public.schools enable row level security;
 
--- District admins see all schools in their district
-create policy "district_admin_see_schools" on public.schools
+create policy "district_admin_see_schools"
+on public.schools
 for select
 to authenticated
 using (
-  is_district_admin()
+  public.is_district_admin()
   and district_id = public.get_user_district_id()
 );
 
--- Head of school sees only their own school
-create policy "head_of_school_see_own_school" on public.schools
+create policy "head_of_school_see_own_school"
+on public.schools
 for select
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and name = public.get_user_school()
 );
 
--- Academic masters see only their school
-create policy "academic_master_see_own_school" on public.schools
+create policy "academic_master_see_own_school"
+on public.schools
 for select
 to authenticated
 using (
-  is_academic_master()
+  public.is_academic_master()
   and name = public.get_user_school()
 );
 
--- Teachers see only their school
-create policy "teacher_see_own_school" on public.schools
+create policy "teacher_see_own_school"
+on public.schools
 for select
 to authenticated
 using (
-  is_teacher()
+  public.is_teacher()
   and name = public.get_user_school()
 );
 
--- District admins can manage schools in their district
-create policy "district_admin_manage_schools" on public.schools
+create policy "district_admin_manage_schools"
+on public.schools
 for all
 to authenticated
 using (
-  is_district_admin()
+  public.is_district_admin()
   and district_id = public.get_user_district_id()
 )
 with check (
-  is_district_admin()
+  public.is_district_admin()
   and district_id = public.get_user_district_id()
 );
 
--- Head of school can manage their own school
-create policy "head_of_school_manage_own_school" on public.schools
+create policy "head_of_school_manage_own_school"
+on public.schools
 for all
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and name = public.get_user_school()
 )
 with check (
-  is_head_of_school()
+  public.is_head_of_school()
   and name = public.get_user_school()
 );
 
@@ -264,52 +351,52 @@ with check (
 
 alter table public.classes enable row level security;
 
--- District admins see all classes in their district
-create policy "district_admin_see_classes" on public.classes
+create policy "district_admin_see_classes"
+on public.classes
 for select
 to authenticated
 using (
-  is_district_admin()
+  public.is_district_admin()
   and district_id = public.get_user_district_id()
 );
 
--- Head of school sees classes in their school
-create policy "head_of_school_see_classes" on public.classes
+create policy "head_of_school_see_classes"
+on public.classes
 for select
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and school_id = public.get_user_school_id()
 );
 
--- Academic masters see all classes in their school
-create policy "academic_master_see_classes" on public.classes
+create policy "academic_master_see_classes"
+on public.classes
 for select
 to authenticated
 using (
-  is_academic_master()
+  public.is_academic_master()
   and school_id = public.get_user_school_id()
 );
 
--- Teachers see only classes they're assigned to
-create policy "teacher_see_assigned_classes" on public.classes
+create policy "teacher_see_assigned_classes"
+on public.classes
 for select
 to authenticated
 using (
-  is_teacher()
+  public.is_teacher()
   and public.user_assigned_to_class(id)
 );
 
--- Head of school can manage classes in their school
-create policy "head_of_school_manage_classes" on public.classes
+create policy "head_of_school_manage_classes"
+on public.classes
 for all
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and school_id = public.get_user_school_id()
 )
 with check (
-  is_head_of_school()
+  public.is_head_of_school()
   and school_id = public.get_user_school_id()
 );
 
@@ -319,61 +406,52 @@ with check (
 
 alter table public.students enable row level security;
 
--- District admins see all students in their district
-create policy "district_admin_see_students" on public.students
+create policy "district_admin_see_students"
+on public.students
 for select
 to authenticated
 using (
-  is_district_admin()
+  public.is_district_admin()
   and district_id = public.get_user_district_id()
 );
 
--- Head of school sees students in their school
-create policy "head_of_school_see_students" on public.students
+create policy "head_of_school_see_students"
+on public.students
 for select
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and school_id = public.get_user_school_id()
 );
 
--- Academic masters see students in their school
-create policy "academic_master_see_students" on public.students
+create policy "academic_master_see_students"
+on public.students
 for select
 to authenticated
 using (
-  is_academic_master()
+  public.is_academic_master()
   and school_id = public.get_user_school_id()
 );
 
--- Teachers see students in their assigned classes
-create policy "teacher_see_students" on public.students
+create policy "teacher_see_students"
+on public.students
 for select
 to authenticated
 using (
-  is_teacher()
-  and (
-    class_id = any(
-      select c.id from public.classes c
-      where c.name = any(
-        select (jsonb_array_elements(public.users.assigned_classes)->>'name')
-        from public.users
-        where id = auth.uid()
-      )
-    )
-  )
+  public.is_teacher()
+  and public.user_assigned_to_class(class_id)
 );
 
--- Head of school can manage students in their school
-create policy "head_of_school_manage_students" on public.students
+create policy "head_of_school_manage_students"
+on public.students
 for all
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and school_id = public.get_user_school_id()
 )
 with check (
-  is_head_of_school()
+  public.is_head_of_school()
   and school_id = public.get_user_school_id()
 );
 
@@ -383,118 +461,98 @@ with check (
 
 alter table public.results enable row level security;
 
--- District admins see all results in their district
-create policy "district_admin_see_results" on public.results
+create policy "district_admin_see_results"
+on public.results
 for select
 to authenticated
 using (
-  is_district_admin()
+  public.is_district_admin()
   and class_id in (
-    select c.id from public.classes c
+    select c.id
+    from public.classes c
     where c.district_id = public.get_user_district_id()
   )
 );
 
--- Head of school sees results for their school
-create policy "head_of_school_see_results" on public.results
+create policy "head_of_school_see_results"
+on public.results
 for select
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and class_id in (
-    select c.id from public.classes c
+    select c.id
+    from public.classes c
     where c.school_id = public.get_user_school_id()
   )
 );
 
--- Academic masters see results for their school
-create policy "academic_master_see_results" on public.results
+create policy "academic_master_see_results"
+on public.results
 for select
 to authenticated
 using (
-  is_academic_master()
+  public.is_academic_master()
   and class_id in (
-    select c.id from public.classes c
+    select c.id
+    from public.classes c
     where c.school_id = public.get_user_school_id()
   )
 );
 
--- Teachers can see and manage results for their classes and subjects
-create policy "teacher_see_results" on public.results
+create policy "teacher_see_results"
+on public.results
 for select
 to authenticated
 using (
-  is_teacher()
+  public.is_teacher()
   and (
-    (
-      -- Results from their assigned classes
-      class_id = any(
-        select c.id from public.classes c
-        where c.name = any(
-          select (jsonb_array_elements(public.users.assigned_classes)->>'name')
-          from public.users
-          where id = auth.uid()
-        )
-      )
-    )
-    or
-    (
-      -- Results in their assigned subject
-      subject = any(
-        select jsonb_array_elements(public.users.subjects)->>'name'
-        from public.users
-        where id = auth.uid()
-      )
-    )
+    public.user_assigned_to_class(class_id)
+    or public.user_teaches_subject(subject)
   )
 );
 
--- Only academic masters and head of school can insert/update results
-create policy "academic_master_insert_results" on public.results
+create policy "academic_master_insert_results"
+on public.results
 for insert
 to authenticated
 with check (
-  (is_academic_master() or is_head_of_school())
+  (public.is_academic_master() or public.is_head_of_school())
   and class_id in (
-    select c.id from public.classes c
+    select c.id
+    from public.classes c
     where c.school_id = public.get_user_school_id()
   )
 );
 
-create policy "academic_master_update_results" on public.results
+create policy "academic_master_update_results"
+on public.results
 for update
 to authenticated
 using (
-  (is_academic_master() or is_head_of_school())
+  (public.is_academic_master() or public.is_head_of_school())
   and class_id in (
-    select c.id from public.classes c
+    select c.id
+    from public.classes c
     where c.school_id = public.get_user_school_id()
   )
 )
 with check (
-  (is_academic_master() or is_head_of_school())
+  (public.is_academic_master() or public.is_head_of_school())
   and class_id in (
-    select c.id from public.classes c
+    select c.id
+    from public.classes c
     where c.school_id = public.get_user_school_id()
   )
 );
 
--- Teachers can insert but not update/delete results
-create policy "teacher_insert_results" on public.results
+create policy "teacher_insert_results"
+on public.results
 for insert
 to authenticated
 with check (
-  is_teacher()
-  and (
-    class_id = any(
-      select c.id from public.classes c
-      where c.name = any(
-        select (jsonb_array_elements(public.users.assigned_classes)->>'name')
-        from public.users
-        where id = auth.uid()
-      )
-    )
-  )
+  public.is_teacher()
+  and public.user_assigned_to_class(class_id)
 );
 
 -- =============================================================================
@@ -503,67 +561,64 @@ with check (
 
 alter table public.exams enable row level security;
 
--- District admins see all exams
-create policy "district_admin_see_exams" on public.exams
+create policy "district_admin_see_exams"
+on public.exams
 for select
 to authenticated
-using (is_district_admin());
+using (public.is_district_admin());
 
--- Head of school sees exams for their school
-create policy "head_of_school_see_exams" on public.exams
+create policy "head_of_school_see_exams"
+on public.exams
 for select
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and class_id in (
-    select c.id from public.classes c
+    select c.id
+    from public.classes c
     where c.school_id = public.get_user_school_id()
   )
 );
 
--- Teachers see exams for their classes
-create policy "teacher_see_exams" on public.exams
+create policy "teacher_see_exams"
+on public.exams
 for select
 to authenticated
 using (
-  is_teacher()
-  and class_id = any(
-    select c.id from public.classes c
-    where c.name = any(
-      select (jsonb_array_elements(public.users.assigned_classes)->>'name')
-      from public.users
-      where id = auth.uid()
-    )
-  )
+  public.is_teacher()
+  and public.user_assigned_to_class(class_id)
 );
 
--- Only head of school can create exams
-create policy "head_of_school_create_exams" on public.exams
+create policy "head_of_school_create_exams"
+on public.exams
 for insert
 to authenticated
 with check (
-  is_head_of_school()
+  public.is_head_of_school()
   and class_id in (
-    select c.id from public.classes c
+    select c.id
+    from public.classes c
     where c.school_id = public.get_user_school_id()
   )
 );
 
--- Teacher can only update own exams they created
-create policy "teacher_manage_own_exams" on public.exams
+create policy "teacher_manage_own_exams"
+on public.exams
 for all
 to authenticated
 using (
-  is_teacher()
+  public.is_teacher()
   and teacher_id in (
-    select id from public.teachers
+    select id
+    from public.teachers
     where user_id = auth.uid()
   )
 )
 with check (
-  is_teacher()
+  public.is_teacher()
   and teacher_id in (
-    select id from public.teachers
+    select id
+    from public.teachers
     where user_id = auth.uid()
   )
 );
@@ -574,22 +629,22 @@ with check (
 
 alter table public.teachers enable row level security;
 
--- Anyone can see teachers in their own school
-create policy "see_teachers_in_school" on public.teachers
+create policy "see_teachers_in_school"
+on public.teachers
 for select
 to authenticated
 using (school_name = public.get_user_school());
 
--- Head of school can manage teachers in their school
-create policy "head_of_school_manage_teachers" on public.teachers
+create policy "head_of_school_manage_teachers"
+on public.teachers
 for all
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and school_name = public.get_user_school()
 )
 with check (
-  is_head_of_school()
+  public.is_head_of_school()
   and school_name = public.get_user_school()
 );
 
@@ -599,34 +654,34 @@ with check (
 
 alter table public.users enable row level security;
 
--- Users can only see themselves
-create policy "users_see_themselves" on public.users
+create policy "users_see_themselves"
+on public.users
 for select
 to authenticated
 using (id = auth.uid());
 
--- Head of school can see other users in their school
-create policy "head_of_school_see_school_users" on public.users
+create policy "head_of_school_see_school_users"
+on public.users
 for select
 to authenticated
 using (
-  is_head_of_school()
+  public.is_head_of_school()
   and school_name = public.get_user_school()
 );
 
--- Users can update only themselves
-create policy "users_update_themselves" on public.users
+create policy "users_update_themselves"
+on public.users
 for update
 to authenticated
 using (id = auth.uid())
 with check (id = auth.uid());
 
--- Admin can update any user
-create policy "district_admin_update_users" on public.users
+create policy "district_admin_update_users"
+on public.users
 for all
 to authenticated
-using (is_district_admin())
-with check (is_district_admin());
+using (public.is_district_admin())
+with check (public.is_district_admin());
 
 -- =============================================================================
 -- SETTINGS RLS POLICIES
@@ -634,19 +689,19 @@ with check (is_district_admin());
 
 alter table public.settings enable row level security;
 
--- All authenticated users can read settings
-create policy "authenticated_read_settings" on public.settings
+create policy "authenticated_read_settings"
+on public.settings
 for select
 to authenticated
 using (true);
 
--- Only head of school or district admin can update settings
-create policy "admin_manage_settings" on public.settings
+create policy "admin_manage_settings"
+on public.settings
 for all
 to authenticated
 using (
-  is_head_of_school() or is_district_admin()
+  public.is_head_of_school() or public.is_district_admin()
 )
 with check (
-  is_head_of_school() or is_district_admin()
+  public.is_head_of_school() or public.is_district_admin()
 );

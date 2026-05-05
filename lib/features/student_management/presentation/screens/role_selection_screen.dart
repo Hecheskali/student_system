@@ -80,13 +80,15 @@ class RoleSelectionScreen extends StatelessWidget {
                       child: Column(
                         children: <Widget>[
                           Text(
-                            'Don\'t have an account?',
+                            'Need a teacher account?',
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                           const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: () => context.go('/signup'),
-                            child: const Text('Create an account as teacher'),
+                          Text(
+                            'Ask the headmaster to create your email and password.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey[600]),
                           ),
                         ],
                       ),

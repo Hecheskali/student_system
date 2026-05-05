@@ -100,6 +100,7 @@ class SupabaseSchoolAdminStore {
     final AuthResponse response = await _service.createUserWithEmailAndPassword(
       draft.email,
       password,
+      data: _authMetadataForDraft(draft),
     );
     final User? user = response.user;
     if (user == null) {
@@ -124,6 +125,22 @@ class SupabaseSchoolAdminStore {
       settings: settings,
     );
 
+    final List<String> teacherSubjects = draft.role == UserRole.teacher
+        ? _normalizedAssignments(
+            draft.subjects,
+            fallback: draft.subject,
+            defaultValue: 'Basic Mathematics',
+            maxItems: 2,
+          )
+        : const <String>[];
+    final List<String> teacherClasses = draft.role == UserRole.teacher
+        ? _normalizedAssignments(
+            draft.assignedClasses,
+            fallback: draft.assignedClass,
+            defaultValue: 'Form 1 A',
+          )
+        : const <String>[];
+
     TeacherAccount? teacher;
     if (draft.role == UserRole.teacher) {
       teacher = await saveTeacher(
@@ -131,30 +148,12 @@ class SupabaseSchoolAdminStore {
           id: '',
           name: draft.name,
           email: draft.email,
-          subject: _normalizedAssignments(
-            draft.subjects,
-            fallback: draft.subject,
-            defaultValue: 'Basic Mathematics',
-            maxItems: 2,
-          ).first,
-          assignedClass: _normalizedAssignments(
-            draft.assignedClasses,
-            fallback: draft.assignedClass,
-            defaultValue: 'Form 1 A',
-          ).first,
+          subject: teacherSubjects.first,
+          assignedClass: teacherClasses.first,
           canUploadResults: true,
           canEditResults: true,
-          subjects: _normalizedAssignments(
-            draft.subjects,
-            fallback: draft.subject,
-            defaultValue: 'Basic Mathematics',
-            maxItems: 2,
-          ).skip(1).toList(growable: false),
-          assignedClasses: _normalizedAssignments(
-            draft.assignedClasses,
-            fallback: draft.assignedClass,
-            defaultValue: 'Form 1 A',
-          ).skip(1).toList(growable: false),
+          subjects: teacherSubjects.skip(1).toList(growable: false),
+          assignedClasses: teacherClasses.skip(1).toList(growable: false),
           canRegisterStudents: settings.allowTeacherStudentRegistration,
           canDownloadResults: settings.allowTeacherResultDownloads,
         ),
@@ -175,8 +174,12 @@ class SupabaseSchoolAdminStore {
       'district_name': draft.districtName,
       'subject': draft.subject,
       'assigned_class': draft.assignedClass,
-      'subjects': draft.subjects,
-      'assigned_classes': draft.assignedClasses,
+      'subjects': draft.role == UserRole.teacher
+          ? teacherSubjects
+          : draft.subjects,
+      'assigned_classes': draft.role == UserRole.teacher
+          ? teacherClasses
+          : draft.assignedClasses,
       'profile': profilePayload,
     });
 
@@ -296,15 +299,16 @@ class SupabaseSchoolAdminStore {
     required String districtName,
     String? userId,
   }) async {
+    final String normalizedEmail = teacher.email.trim().toLowerCase();
     final Map<String, dynamic>? existing = await _findTeacher(
       teacherId: _looksLikeUuid(teacher.id) ? teacher.id : null,
       userId: userId,
-      email: teacher.email,
+      email: normalizedEmail,
     );
 
     final Map<String, dynamic> payload = <String, dynamic>{
       'name': teacher.name,
-      'email': teacher.email,
+      'email': normalizedEmail,
       'subject': teacher.subject,
       'assigned_class': teacher.assignedClass,
       'can_upload_results': teacher.canUploadResults,
@@ -330,6 +334,79 @@ class SupabaseSchoolAdminStore {
         .select()
         .single();
     return _teacherFromRow(_asMap(saved));
+  }
+
+  Future<TeacherAccount> createTeacherAccount({
+    required TeacherAccount teacher,
+    required String password,
+    required String schoolName,
+    required String districtName,
+  }) async {
+    final String email = teacher.email.trim().toLowerCase();
+    final Session? previousSession = _service.currentSession;
+
+    await ensureReferenceData(
+      schoolName: schoolName,
+      districtName: districtName,
+      classNames: teacher.effectiveClasses,
+    );
+
+    final AuthResponse response = await _service.createUserWithEmailAndPassword(
+      email,
+      password,
+      data: _authMetadataForTeacher(
+        teacher.copyWith(email: email),
+        schoolName: schoolName,
+        districtName: districtName,
+      ),
+    );
+    final User? user = response.user;
+    if (user == null) {
+      throw StateError('Supabase did not return a user for this teacher.');
+    }
+
+    try {
+      await _service.createUserProfile(user.id, <String, dynamic>{
+        'name': teacher.name,
+        'email': email,
+        'role': _roleToDatabase(UserRole.teacher),
+        'school_name': schoolName,
+        'district_name': districtName,
+        'subject': teacher.subject,
+        'assigned_class': teacher.assignedClass,
+        'subjects': teacher.effectiveSubjects,
+        'assigned_classes': teacher.effectiveClasses,
+        'profile': const <String, dynamic>{},
+      });
+
+      final TeacherAccount savedTeacher = await saveTeacher(
+        teacher: teacher.copyWith(email: email),
+        schoolName: schoolName,
+        districtName: districtName,
+        userId: user.id,
+      );
+
+      await _service.createUserProfile(user.id, <String, dynamic>{
+        'name': savedTeacher.name,
+        'email': savedTeacher.email,
+        'role': _roleToDatabase(UserRole.teacher),
+        'school_name': schoolName,
+        'district_name': districtName,
+        'subject': savedTeacher.subject,
+        'assigned_class': savedTeacher.assignedClass,
+        'subjects': savedTeacher.effectiveSubjects,
+        'assigned_classes': savedTeacher.effectiveClasses,
+        'profile': <String, dynamic>{'teacher_id': savedTeacher.id},
+      });
+
+      return savedTeacher;
+    } finally {
+      final User? currentUser = _service.currentUser;
+      if (previousSession != null &&
+          (currentUser == null || currentUser.id != previousSession.user.id)) {
+        await _service.restoreSession(previousSession);
+      }
+    }
   }
 
   Future<void> deleteTeacher(String teacherId) async {
@@ -571,6 +648,9 @@ class SupabaseSchoolAdminStore {
     Map<String, dynamic>? profile = await _service.getUserProfile(user.id);
     if (profile == null) {
       final Map<String, dynamic> metadata = _mapValue(user.userMetadata);
+      final UserRole metadataRole = _roleFromDatabase(
+        _stringValue(metadata, 'role', fallback: 'head_of_school'),
+      );
       final String displayName = _stringValue(
         metadata,
         'full_name',
@@ -580,25 +660,39 @@ class SupabaseSchoolAdminStore {
           fallback: (user.email ?? 'Administrator').split('@').first,
         ),
       );
+      final String metadataSchoolName = _stringValue(
+        metadata,
+        'school_name',
+        fallback: schoolName,
+      );
+      final String metadataDistrictName = _stringValue(
+        metadata,
+        'district_name',
+        fallback: districtName,
+      );
       await _service.createUserProfile(user.id, <String, dynamic>{
         'name': displayName,
         'email': user.email ?? '',
-        'role': 'head_of_school',
-        'school_name': schoolName,
-        'district_name': districtName,
-        'subjects': const <String>[],
-        'assigned_classes': const <String>[],
+        'role': _roleToDatabase(metadataRole),
+        'school_name': metadataSchoolName,
+        'district_name': metadataDistrictName,
+        'subject': _nullableString(metadata['subject']),
+        'assigned_class': _nullableString(metadata['assigned_class']),
+        'subjects': _stringList(metadata['subjects']),
+        'assigned_classes': _stringList(metadata['assigned_classes']),
         'profile': const <String, dynamic>{'auto_provisioned': true},
       });
       profile = await _service.getUserProfile(user.id);
       profile ??= <String, dynamic>{
         'name': displayName,
         'email': user.email ?? '',
-        'role': 'head_of_school',
-        'school_name': schoolName,
-        'district_name': districtName,
-        'subjects': const <String>[],
-        'assigned_classes': const <String>[],
+        'role': _roleToDatabase(metadataRole),
+        'school_name': metadataSchoolName,
+        'district_name': metadataDistrictName,
+        'subject': _nullableString(metadata['subject']),
+        'assigned_class': _nullableString(metadata['assigned_class']),
+        'subjects': _stringList(metadata['subjects']),
+        'assigned_classes': _stringList(metadata['assigned_classes']),
         'profile': const <String, dynamic>{'auto_provisioned': true},
       };
     }
@@ -623,7 +717,8 @@ class SupabaseSchoolAdminStore {
 
       TeacherAccount? teacher;
       for (final TeacherAccount item in teachers) {
-        if (item.id == teacherId || item.email == user.email) {
+        if (item.id == teacherId ||
+            item.email.toLowerCase() == (user.email ?? '').toLowerCase()) {
           teacher = item;
           break;
         }
@@ -675,7 +770,7 @@ class SupabaseSchoolAdminStore {
 
     final Map<String, dynamic>? byEmail = await _findTeacher(
       userId: null,
-      email: email,
+      email: email.trim().toLowerCase(),
     );
     if (byEmail != null) {
       return _teacherFromRow(byEmail);
@@ -1231,6 +1326,54 @@ String _roleToDatabase(UserRole role) {
     case UserRole.headOfSchool:
       return 'head_of_school';
   }
+}
+
+Map<String, dynamic> _authMetadataForDraft(SignUpDraft draft) {
+  final List<String> subjects = draft.role == UserRole.teacher
+      ? _normalizedAssignments(
+          draft.subjects,
+          fallback: draft.subject,
+          defaultValue: 'Basic Mathematics',
+          maxItems: 2,
+        )
+      : draft.subjects;
+  final List<String> assignedClasses = draft.role == UserRole.teacher
+      ? _normalizedAssignments(
+          draft.assignedClasses,
+          fallback: draft.assignedClass,
+          defaultValue: 'Form 1 A',
+        )
+      : draft.assignedClasses;
+
+  return <String, dynamic>{
+    'full_name': draft.name,
+    'name': draft.name,
+    'role': _roleToDatabase(draft.role),
+    'school_name': draft.schoolName,
+    'district_name': draft.districtName,
+    if (draft.subject != null) 'subject': draft.subject,
+    if (draft.assignedClass != null) 'assigned_class': draft.assignedClass,
+    'subjects': subjects,
+    'assigned_classes': assignedClasses,
+  };
+}
+
+Map<String, dynamic> _authMetadataForTeacher(
+  TeacherAccount teacher, {
+  required String schoolName,
+  required String districtName,
+}) {
+  return <String, dynamic>{
+    'full_name': teacher.name,
+    'name': teacher.name,
+    'role': _roleToDatabase(UserRole.teacher),
+    'school_name': schoolName,
+    'district_name': districtName,
+    'subject': teacher.subject,
+    'assigned_class': teacher.assignedClass,
+    'subjects': teacher.effectiveSubjects,
+    'assigned_classes': teacher.effectiveClasses,
+  };
 }
 
 UserRole _roleFromDatabase(String value) {

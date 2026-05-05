@@ -19,6 +19,8 @@ class SupabaseService {
 
   User? get currentUser => auth.currentUser;
 
+  Session? get currentSession => auth.currentSession;
+
   Stream<AuthState> get authStateChanges => auth.onAuthStateChange;
 
   Future<AuthResponse> signInWithEmailAndPassword(
@@ -30,16 +32,28 @@ class SupabaseService {
 
   Future<AuthResponse> createUserWithEmailAndPassword(
     String email,
-    String password,
-  ) {
-    return auth.signUp(email: email, password: password);
+    String password, {
+    Map<String, dynamic>? data,
+  }) {
+    return auth.signUp(email: email, password: password, data: data);
+  }
+
+  Future<void> restoreSession(Session session) async {
+    final String? refreshToken = session.refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      return;
+    }
+    await auth.setSession(refreshToken, accessToken: session.accessToken);
   }
 
   Future<void> signOut() async {
     await auth.signOut();
   }
 
-  Future<void> createUserProfile(String uid, Map<String, dynamic> userData) async {
+  Future<void> createUserProfile(
+    String uid,
+    Map<String, dynamic> userData,
+  ) async {
     await _client.from(_usersTable).upsert(<String, dynamic>{
       'id': uid,
       ...userData,
@@ -50,7 +64,10 @@ class SupabaseService {
     return _client.from(_usersTable).select().eq('id', uid).maybeSingle();
   }
 
-  Future<void> updateUserProfile(String uid, Map<String, dynamic> updates) async {
+  Future<void> updateUserProfile(
+    String uid,
+    Map<String, dynamic> updates,
+  ) async {
     await _client.from(_usersTable).update(updates).eq('id', uid);
   }
 
@@ -94,15 +111,15 @@ class SupabaseService {
   }
 
   Future<void> setUploadDeadline(DateTime deadline) {
-    return _upsertDeadlineField(
-      <String, dynamic>{'upload_deadline': deadline.toIso8601String()},
-    );
+    return _upsertDeadlineField(<String, dynamic>{
+      'upload_deadline': deadline.toIso8601String(),
+    });
   }
 
   Future<void> setEditDeadline(DateTime deadline) {
-    return _upsertDeadlineField(
-      <String, dynamic>{'edit_deadline': deadline.toIso8601String()},
-    );
+    return _upsertDeadlineField(<String, dynamic>{
+      'edit_deadline': deadline.toIso8601String(),
+    });
   }
 
   Future<Map<String, dynamic>?> getDeadlines() {
@@ -122,9 +139,9 @@ class SupabaseService {
   }
 
   Future<void> _upsertDeadlineField(Map<String, dynamic> value) async {
-    await _client.from(_settingsTable).upsert(
-      <String, dynamic>{'id': 'deadlines', ...value},
-      onConflict: 'id',
-    );
+    await _client.from(_settingsTable).upsert(<String, dynamic>{
+      'id': 'deadlines',
+      ...value,
+    }, onConflict: 'id');
   }
 }

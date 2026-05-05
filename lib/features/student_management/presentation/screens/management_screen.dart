@@ -4978,6 +4978,7 @@ Future<void> _showTeacherEditorDialog(
   final bool editing = teacher != null;
   final nameController = TextEditingController(text: teacher?.name ?? '');
   final emailController = TextEditingController(text: teacher?.email ?? '');
+  final passwordController = TextEditingController();
   final selectedSubjects = <String>{...?teacher?.effectiveSubjects}
     ..removeWhere((s) => s.trim().isEmpty);
   final selectedClasses = <String>{...?teacher?.effectiveClasses}
@@ -5012,6 +5013,16 @@ Future<void> _showTeacherEditorDialog(
                       controller: emailController,
                       decoration: const InputDecoration(labelText: 'Email'),
                     ),
+                    if (!editing) ...<Widget>[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: passwordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Initial password',
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     Text(
                       'Assign up to two subjects',
@@ -5087,8 +5098,10 @@ Future<void> _showTeacherEditorDialog(
               FilledButton(
                 onPressed: () {
                   final name = nameController.text.trim();
-                  final email = emailController.text.trim();
+                  final email = emailController.text.trim().toLowerCase();
+                  final password = passwordController.text.trim();
                   if (name.isEmpty || !email.contains('@')) return;
+                  if (!editing && password.length < 6) return;
 
                   final subjects = selectedSubjects.toList();
                   final classes = selectedClasses.toList();
@@ -5106,6 +5119,7 @@ Future<void> _showTeacherEditorDialog(
                       email: email,
                       subjects: subjects,
                       assignedClasses: classes,
+                      password: password,
                     );
                   }
 
@@ -5122,6 +5136,7 @@ Future<void> _showTeacherEditorDialog(
 
   nameController.dispose();
   emailController.dispose();
+  passwordController.dispose();
 }
 
 Future<void> _showRemoveTeacherDialog(
