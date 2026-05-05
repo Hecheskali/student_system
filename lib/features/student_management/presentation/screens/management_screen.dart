@@ -4985,6 +4985,7 @@ Future<void> _showTeacherEditorDialog(
     ..removeWhere((s) => s.trim().isEmpty);
   if (selectedSubjects.isEmpty) selectedSubjects.add('Basic Mathematics');
   if (selectedClasses.isEmpty) selectedClasses.add('Form 1 A');
+  bool saving = false;
 
   await showDialog<void>(
     context: context,
@@ -5092,40 +5093,77 @@ Future<void> _showTeacherEditorDialog(
             ),
             actions: <Widget>[
               TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
+                onPressed: saving
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(),
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: () {
-                  final name = nameController.text.trim();
-                  final email = emailController.text.trim().toLowerCase();
-                  final password = passwordController.text.trim();
-                  if (name.isEmpty || !email.contains('@')) return;
-                  if (!editing && password.length < 6) return;
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final name = nameController.text.trim();
+                        final email = emailController.text.trim().toLowerCase();
+                        final password = passwordController.text.trim();
+                        if (name.isEmpty || !email.contains('@')) return;
+                        if (!editing && password.length < 6) return;
 
-                  final subjects = selectedSubjects.toList();
-                  final classes = selectedClasses.toList();
-                  final controller = ref.read(schoolAdminProvider.notifier);
+                        final subjects = selectedSubjects.toList();
+                        final classes = selectedClasses.toList();
+                        final controller = ref.read(
+                          schoolAdminProvider.notifier,
+                        );
 
-                  if (editing) {
-                    controller.updateTeacherAssignments(
-                      teacherId: teacher.id,
-                      subjects: subjects,
-                      assignedClasses: classes,
-                    );
-                  } else {
-                    controller.addTeacher(
-                      name: name,
-                      email: email,
-                      subjects: subjects,
-                      assignedClasses: classes,
-                      password: password,
-                    );
-                  }
-
-                  Navigator.of(dialogContext).pop();
-                },
-                child: Text(editing ? 'Save' : 'Register'),
+                        if (editing) {
+                          controller.updateTeacherAssignments(
+                            teacherId: teacher.id,
+                            subjects: subjects,
+                            assignedClasses: classes,
+                          );
+                          Navigator.of(dialogContext).pop();
+                        } else {
+                          setState(() {
+                            saving = true;
+                          });
+                          bool keepDialogOpen = true;
+                          try {
+                            await controller.addTeacher(
+                              name: name,
+                              email: email,
+                              subjects: subjects,
+                              assignedClasses: classes,
+                              password: password,
+                            );
+                            keepDialogOpen = false;
+                            if (dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
+                          } on Object catch (error) {
+                            if (dialogContext.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    _teacherSaveErrorMessage(error),
+                                  ),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (keepDialogOpen && dialogContext.mounted) {
+                              setState(() {
+                                saving = false;
+                              });
+                            }
+                          }
+                        }
+                      },
+                child: saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(editing ? 'Save' : 'Register'),
               ),
             ],
           );
@@ -5170,6 +5208,29 @@ Future<void> _showRemoveTeacherDialog(
       );
     },
   );
+}
+
+String _teacherSaveErrorMessage(Object error) {
+  final String normalized = error
+      .toString()
+      .replaceFirst(RegExp(r'^[A-Za-z]+(?:Exception|Error):\s*'), '')
+      .trim();
+  final String lower = normalized.toLowerCase();
+  if (lower.contains('already registered') ||
+      lower.contains('already exists') ||
+      lower.contains('duplicate key')) {
+    return 'That email is already registered. Use another email or edit the existing teacher.';
+  }
+  if (lower.contains('password')) {
+    return 'Teacher account was not created. Use a stronger password, at least 6 characters.';
+  }
+  if (lower.contains('row-level security') || lower.contains('rls')) {
+    return 'Teacher account was not created because Supabase policies blocked it. Apply the latest migration, then try again.';
+  }
+  if (normalized.isEmpty) {
+    return 'Teacher account was not created. Please try again.';
+  }
+  return 'Teacher account was not created: $normalized';
 }
 
 String _sheetSessionKey({

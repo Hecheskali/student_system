@@ -1337,6 +1337,7 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
     if (selectedClasses.isEmpty) {
       selectedClasses.add('Form 1 A');
     }
+    bool saving = false;
 
     await showDialog<void>(
       context: context,
@@ -1434,54 +1435,93 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
               ),
               actions: <Widget>[
                 TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  onPressed: saving
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
                   child: const Text('Cancel'),
                 ),
                 FilledButton(
-                  onPressed: () {
-                    final String name = nameController.text.trim();
-                    final String email = emailController.text
-                        .trim()
-                        .toLowerCase();
-                    final String password = passwordController.text.trim();
-                    if (name.isEmpty || !email.contains('@')) {
-                      return;
-                    }
-                    if (!editing && password.length < 6) {
-                      return;
-                    }
-                    final SchoolAdminController controller = ref.read(
-                      schoolAdminProvider.notifier,
-                    );
-                    if (editing) {
-                      controller.updateTeacherAssignments(
-                        teacherId: teacher.id,
-                        subjects: selectedSubjects.toList(),
-                        assignedClasses: selectedClasses.toList(),
-                      );
-                      _audit(
-                        action: 'Edited teacher',
-                        target: name,
-                        detail:
-                            'Teacher subject and class assignments updated.',
-                      );
-                    } else {
-                      controller.addTeacher(
-                        name: name,
-                        email: email,
-                        subjects: selectedSubjects.toList(),
-                        assignedClasses: selectedClasses.toList(),
-                        password: password,
-                      );
-                      _audit(
-                        action: 'Added teacher',
-                        target: name,
-                        detail: 'Teacher account registered in the panel.',
-                      );
-                    }
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: Text(editing ? 'Save' : 'Create'),
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final String name = nameController.text.trim();
+                          final String email = emailController.text
+                              .trim()
+                              .toLowerCase();
+                          final String password = passwordController.text
+                              .trim();
+                          if (name.isEmpty || !email.contains('@')) {
+                            return;
+                          }
+                          if (!editing && password.length < 6) {
+                            return;
+                          }
+                          final SchoolAdminController controller = ref.read(
+                            schoolAdminProvider.notifier,
+                          );
+                          if (editing) {
+                            controller.updateTeacherAssignments(
+                              teacherId: teacher.id,
+                              subjects: selectedSubjects.toList(),
+                              assignedClasses: selectedClasses.toList(),
+                            );
+                            _audit(
+                              action: 'Edited teacher',
+                              target: name,
+                              detail:
+                                  'Teacher subject and class assignments updated.',
+                            );
+                            Navigator.of(dialogContext).pop();
+                            return;
+                          }
+
+                          setDialogState(() {
+                            saving = true;
+                          });
+                          bool keepDialogOpen = true;
+                          try {
+                            await controller.addTeacher(
+                              name: name,
+                              email: email,
+                              subjects: selectedSubjects.toList(),
+                              assignedClasses: selectedClasses.toList(),
+                              password: password,
+                            );
+                            _audit(
+                              action: 'Added teacher',
+                              target: name,
+                              detail:
+                                  'Teacher account registered in the panel.',
+                            );
+                            keepDialogOpen = false;
+                            if (dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
+                          } on Object catch (error) {
+                            if (dialogContext.mounted) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    _teacherSaveErrorMessage(error),
+                                  ),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (keepDialogOpen && dialogContext.mounted) {
+                              setDialogState(() {
+                                saving = false;
+                              });
+                            }
+                          }
+                        },
+                  child: saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(editing ? 'Save' : 'Create'),
                 ),
               ],
             );
@@ -3509,6 +3549,29 @@ String _teacherTimetable(TeacherAccount teacher) {
       ? 'Class'
       : teacher.effectiveClasses.first;
   return 'Mon/Wed/Fri - $subject - $className';
+}
+
+String _teacherSaveErrorMessage(Object error) {
+  final String normalized = error
+      .toString()
+      .replaceFirst(RegExp(r'^[A-Za-z]+(?:Exception|Error):\s*'), '')
+      .trim();
+  final String lower = normalized.toLowerCase();
+  if (lower.contains('already registered') ||
+      lower.contains('already exists') ||
+      lower.contains('duplicate key')) {
+    return 'That email is already registered. Use another email or edit the existing teacher.';
+  }
+  if (lower.contains('password')) {
+    return 'Teacher account was not created. Use a stronger password, at least 6 characters.';
+  }
+  if (lower.contains('row-level security') || lower.contains('rls')) {
+    return 'Teacher account was not created because Supabase policies blocked it. Apply the latest migration, then try again.';
+  }
+  if (normalized.isEmpty) {
+    return 'Teacher account was not created. Please try again.';
+  }
+  return 'Teacher account was not created: $normalized';
 }
 
 String _money(double value) {

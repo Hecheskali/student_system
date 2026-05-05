@@ -366,6 +366,13 @@ class SupabaseSchoolAdminStore {
     }
 
     try {
+      final User? currentUserAfterSignup = _service.currentUser;
+      if (previousSession != null &&
+          currentUserAfterSignup != null &&
+          currentUserAfterSignup.id != previousSession.user.id) {
+        await _service.restoreSession(previousSession);
+      }
+
       await _service.createUserProfile(user.id, <String, dynamic>{
         'name': teacher.name,
         'email': email,
