@@ -454,7 +454,13 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
 
     try {
       final String initialPassword = password?.trim() ?? '';
-      final TeacherAccount savedTeacher = initialPassword.isEmpty
+      // If no password provided, always use saveTeacher (offline-friendly)
+      // If password provided, check if we have a real Supabase session
+      // If no real Supabase session, treat as offline and save locally
+      final bool shouldCreateWithPassword =
+          initialPassword.isNotEmpty && store.isAuthenticated;
+
+      final TeacherAccount savedTeacher = !shouldCreateWithPassword
           ? await store.saveTeacher(
               teacher: teacher,
               schoolName: state.schoolName,

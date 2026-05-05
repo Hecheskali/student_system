@@ -53,6 +53,8 @@ class SupabaseSchoolAdminStore {
 
   SupabaseClient get _client => _service.client;
 
+  bool get isAuthenticated => _service.currentUser != null;
+
   Future<SupabaseSchoolAdminLoadResult> load({
     required SchoolAdminState fallbackState,
   }) async {
