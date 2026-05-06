@@ -1,6 +1,5 @@
 import 'package:go_router/go_router.dart';
 
-import '../../features/student_management/domain/entities/education_entities.dart';
 import '../../features/student_management/presentation/screens/analytics_screen.dart';
 import '../../features/student_management/presentation/screens/all_results_screen.dart';
 import '../../features/student_management/presentation/screens/dashboard_screen.dart';
@@ -16,7 +15,6 @@ import '../../features/student_management/presentation/screens/results_screen.da
 import '../../features/student_management/presentation/screens/role_selection_screen.dart';
 import '../../features/student_management/presentation/screens/search_screen.dart';
 import '../../features/student_management/presentation/screens/settings_screen.dart';
-import '../../features/student_management/presentation/screens/signup_screen.dart';
 import '../../features/student_management/presentation/screens/splash_screen.dart';
 import '../../features/student_management/presentation/screens/student_detail_screen.dart';
 import '../../features/student_management/presentation/screens/student_intake_screen.dart';
@@ -39,19 +37,6 @@ class AppRouter {
       GoRoute(
         path: '/teacher-login',
         builder: (context, state) => const TeacherLoginScreen(),
-      ),
-      GoRoute(
-        path: '/signup',
-        builder: (context, state) {
-          final String role = state.uri.queryParameters['role'] ?? 'teacher';
-          return SignUpScreen(
-            initialRole: role == 'headmaster'
-                ? UserRole.headOfSchool
-                : role == 'academicmaster'
-                ? UserRole.academicMaster
-                : UserRole.teacher,
-          );
-        },
       ),
       GoRoute(
         path: '/dashboard',

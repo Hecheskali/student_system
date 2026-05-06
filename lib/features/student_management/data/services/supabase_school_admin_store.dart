@@ -39,13 +39,6 @@ class SupabaseSchoolAdminLoadResult {
   final SessionUser? session;
 }
 
-@immutable
-class SupabaseSchoolAdminAuthResult {
-  const SupabaseSchoolAdminAuthResult({required this.session});
-
-  final SessionUser session;
-}
-
 class SupabaseSchoolAdminStore {
   SupabaseSchoolAdminStore(this._service);
 
@@ -54,6 +47,8 @@ class SupabaseSchoolAdminStore {
   SupabaseClient get _client => _service.client;
 
   bool get isAuthenticated => _service.currentUser != null;
+
+  String? get accessToken => _service.currentSession?.accessToken;
 
   Future<SupabaseSchoolAdminLoadResult> load({
     required SchoolAdminState fallbackState,
@@ -91,123 +86,6 @@ class SupabaseSchoolAdminStore {
       studentResults: studentResults,
       session: session,
     );
-  }
-
-  Future<SupabaseSchoolAdminAuthResult> registerUser({
-    required SignUpDraft draft,
-    required String password,
-    required SchoolSettings settings,
-    required ResultWindowSettings resultWindow,
-  }) async {
-    final AuthResponse response = await _service.createUserWithEmailAndPassword(
-      draft.email,
-      password,
-      data: _authMetadataForDraft(draft),
-    );
-    final User? user = response.user;
-    if (user == null) {
-      throw StateError('Supabase did not return a user for this sign up.');
-    }
-
-    await ensureReferenceData(
-      schoolName: draft.schoolName,
-      districtName: draft.districtName,
-      classNames: <String>[
-        ...kStandardSchoolClassNames,
-        ...draft.assignedClasses,
-        if (draft.assignedClass != null) draft.assignedClass!,
-      ],
-    );
-
-    await saveSettings(
-      schoolName: draft.schoolName,
-      districtName: draft.districtName,
-      headmasterName: draft.role == UserRole.headOfSchool ? draft.name : null,
-      resultWindow: resultWindow,
-      settings: settings,
-    );
-
-    final List<String> teacherSubjects = draft.role == UserRole.teacher
-        ? _normalizedAssignments(
-            draft.subjects,
-            fallback: draft.subject,
-            defaultValue: 'Basic Mathematics',
-            maxItems: 2,
-          )
-        : const <String>[];
-    final List<String> teacherClasses = draft.role == UserRole.teacher
-        ? _normalizedAssignments(
-            draft.assignedClasses,
-            fallback: draft.assignedClass,
-            defaultValue: 'Form 1 A',
-          )
-        : const <String>[];
-
-    TeacherAccount? teacher;
-    if (draft.role == UserRole.teacher) {
-      teacher = await saveTeacher(
-        teacher: TeacherAccount(
-          id: '',
-          name: draft.name,
-          email: draft.email,
-          subject: teacherSubjects.first,
-          assignedClass: teacherClasses.first,
-          canUploadResults: true,
-          canEditResults: true,
-          subjects: teacherSubjects.skip(1).toList(growable: false),
-          assignedClasses: teacherClasses.skip(1).toList(growable: false),
-          canRegisterStudents: settings.allowTeacherStudentRegistration,
-          canDownloadResults: settings.allowTeacherResultDownloads,
-        ),
-        schoolName: draft.schoolName,
-        districtName: draft.districtName,
-        userId: user.id,
-      );
-    }
-
-    final Map<String, dynamic> profilePayload = <String, dynamic>{
-      if (teacher != null) 'teacher_id': teacher.id,
-    };
-    await _service.createUserProfile(user.id, <String, dynamic>{
-      'name': draft.name,
-      'email': draft.email,
-      'role': _roleToDatabase(draft.role),
-      'school_name': draft.schoolName,
-      'district_name': draft.districtName,
-      'subject': draft.subject,
-      'assigned_class': draft.assignedClass,
-      'subjects': draft.role == UserRole.teacher
-          ? teacherSubjects
-          : draft.subjects,
-      'assigned_classes': draft.role == UserRole.teacher
-          ? teacherClasses
-          : draft.assignedClasses,
-      'profile': profilePayload,
-    });
-
-    final SessionUser session = teacher != null
-        ? SessionUser(
-            id: teacher.id,
-            name: draft.name,
-            email: draft.email,
-            role: draft.role,
-            schoolName: draft.schoolName,
-            districtName: draft.districtName,
-            subject: teacher.subject,
-            assignedClass: teacher.assignedClass,
-            subjects: teacher.effectiveSubjects,
-            assignedClasses: teacher.effectiveClasses,
-          )
-        : SessionUser(
-            id: user.id,
-            name: draft.name,
-            email: draft.email,
-            role: draft.role,
-            schoolName: draft.schoolName,
-            districtName: draft.districtName,
-          );
-
-    return SupabaseSchoolAdminAuthResult(session: session);
   }
 
   Future<SessionUser?> signIn({
@@ -336,86 +214,6 @@ class SupabaseSchoolAdminStore {
         .select()
         .single();
     return _teacherFromRow(_asMap(saved));
-  }
-
-  Future<TeacherAccount> createTeacherAccount({
-    required TeacherAccount teacher,
-    required String password,
-    required String schoolName,
-    required String districtName,
-  }) async {
-    final String email = teacher.email.trim().toLowerCase();
-    final Session? previousSession = _service.currentSession;
-
-    await ensureReferenceData(
-      schoolName: schoolName,
-      districtName: districtName,
-      classNames: teacher.effectiveClasses,
-    );
-
-    final AuthResponse response = await _service.createUserWithEmailAndPassword(
-      email,
-      password,
-      data: _authMetadataForTeacher(
-        teacher.copyWith(email: email),
-        schoolName: schoolName,
-        districtName: districtName,
-      ),
-    );
-    final User? user = response.user;
-    if (user == null) {
-      throw StateError('Supabase did not return a user for this teacher.');
-    }
-
-    try {
-      final User? currentUserAfterSignup = _service.currentUser;
-      if (previousSession != null &&
-          currentUserAfterSignup != null &&
-          currentUserAfterSignup.id != previousSession.user.id) {
-        await _service.restoreSession(previousSession);
-      }
-
-      await _service.createUserProfile(user.id, <String, dynamic>{
-        'name': teacher.name,
-        'email': email,
-        'role': _roleToDatabase(UserRole.teacher),
-        'school_name': schoolName,
-        'district_name': districtName,
-        'subject': teacher.subject,
-        'assigned_class': teacher.assignedClass,
-        'subjects': teacher.effectiveSubjects,
-        'assigned_classes': teacher.effectiveClasses,
-        'profile': const <String, dynamic>{},
-      });
-
-      final TeacherAccount savedTeacher = await saveTeacher(
-        teacher: teacher.copyWith(email: email),
-        schoolName: schoolName,
-        districtName: districtName,
-        userId: user.id,
-      );
-
-      await _service.createUserProfile(user.id, <String, dynamic>{
-        'name': savedTeacher.name,
-        'email': savedTeacher.email,
-        'role': _roleToDatabase(UserRole.teacher),
-        'school_name': schoolName,
-        'district_name': districtName,
-        'subject': savedTeacher.subject,
-        'assigned_class': savedTeacher.assignedClass,
-        'subjects': savedTeacher.effectiveSubjects,
-        'assigned_classes': savedTeacher.effectiveClasses,
-        'profile': <String, dynamic>{'teacher_id': savedTeacher.id},
-      });
-
-      return savedTeacher;
-    } finally {
-      final User? currentUser = _service.currentUser;
-      if (previousSession != null &&
-          (currentUser == null || currentUser.id != previousSession.user.id)) {
-        await _service.restoreSession(previousSession);
-      }
-    }
   }
 
   Future<void> deleteTeacher(String teacherId) async {
@@ -656,54 +454,7 @@ class SupabaseSchoolAdminStore {
 
     Map<String, dynamic>? profile = await _service.getUserProfile(user.id);
     if (profile == null) {
-      final Map<String, dynamic> metadata = _mapValue(user.userMetadata);
-      final UserRole metadataRole = _roleFromDatabase(
-        _stringValue(metadata, 'role', fallback: 'head_of_school'),
-      );
-      final String displayName = _stringValue(
-        metadata,
-        'full_name',
-        fallback: _stringValue(
-          metadata,
-          'name',
-          fallback: (user.email ?? 'Administrator').split('@').first,
-        ),
-      );
-      final String metadataSchoolName = _stringValue(
-        metadata,
-        'school_name',
-        fallback: schoolName,
-      );
-      final String metadataDistrictName = _stringValue(
-        metadata,
-        'district_name',
-        fallback: districtName,
-      );
-      await _service.createUserProfile(user.id, <String, dynamic>{
-        'name': displayName,
-        'email': user.email ?? '',
-        'role': _roleToDatabase(metadataRole),
-        'school_name': metadataSchoolName,
-        'district_name': metadataDistrictName,
-        'subject': _nullableString(metadata['subject']),
-        'assigned_class': _nullableString(metadata['assigned_class']),
-        'subjects': _stringList(metadata['subjects']),
-        'assigned_classes': _stringList(metadata['assigned_classes']),
-        'profile': const <String, dynamic>{'auto_provisioned': true},
-      });
-      profile = await _service.getUserProfile(user.id);
-      profile ??= <String, dynamic>{
-        'name': displayName,
-        'email': user.email ?? '',
-        'role': _roleToDatabase(metadataRole),
-        'school_name': metadataSchoolName,
-        'district_name': metadataDistrictName,
-        'subject': _nullableString(metadata['subject']),
-        'assigned_class': _nullableString(metadata['assigned_class']),
-        'subjects': _stringList(metadata['subjects']),
-        'assigned_classes': _stringList(metadata['assigned_classes']),
-        'profile': const <String, dynamic>{'auto_provisioned': true},
-      };
+      return null;
     }
 
     final UserRole role = _roleFromDatabase(
@@ -1326,65 +1077,6 @@ double _gpaFromAverage(double average) {
   return double.parse((average.clamp(0, 100) / 20).toStringAsFixed(2));
 }
 
-String _roleToDatabase(UserRole role) {
-  switch (role) {
-    case UserRole.teacher:
-      return 'teacher';
-    case UserRole.academicMaster:
-      return 'academic_master';
-    case UserRole.headOfSchool:
-      return 'head_of_school';
-  }
-}
-
-Map<String, dynamic> _authMetadataForDraft(SignUpDraft draft) {
-  final List<String> subjects = draft.role == UserRole.teacher
-      ? _normalizedAssignments(
-          draft.subjects,
-          fallback: draft.subject,
-          defaultValue: 'Basic Mathematics',
-          maxItems: 2,
-        )
-      : draft.subjects;
-  final List<String> assignedClasses = draft.role == UserRole.teacher
-      ? _normalizedAssignments(
-          draft.assignedClasses,
-          fallback: draft.assignedClass,
-          defaultValue: 'Form 1 A',
-        )
-      : draft.assignedClasses;
-
-  return <String, dynamic>{
-    'full_name': draft.name,
-    'name': draft.name,
-    'role': _roleToDatabase(draft.role),
-    'school_name': draft.schoolName,
-    'district_name': draft.districtName,
-    if (draft.subject != null) 'subject': draft.subject,
-    if (draft.assignedClass != null) 'assigned_class': draft.assignedClass,
-    'subjects': subjects,
-    'assigned_classes': assignedClasses,
-  };
-}
-
-Map<String, dynamic> _authMetadataForTeacher(
-  TeacherAccount teacher, {
-  required String schoolName,
-  required String districtName,
-}) {
-  return <String, dynamic>{
-    'full_name': teacher.name,
-    'name': teacher.name,
-    'role': _roleToDatabase(UserRole.teacher),
-    'school_name': schoolName,
-    'district_name': districtName,
-    'subject': teacher.subject,
-    'assigned_class': teacher.assignedClass,
-    'subjects': teacher.effectiveSubjects,
-    'assigned_classes': teacher.effectiveClasses,
-  };
-}
-
 UserRole _roleFromDatabase(String value) {
   switch (value) {
     case 'academic_master':
@@ -1576,25 +1268,4 @@ bool _looksLikeUuid(String value) {
   return RegExp(
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
   ).hasMatch(value);
-}
-
-List<String> _normalizedAssignments(
-  List<String> values, {
-  String? fallback,
-  required String defaultValue,
-  int? maxItems,
-}) {
-  final Set<String> unique = <String>{
-    ...values
-        .map((String value) => value.trim())
-        .where((String value) => value.isNotEmpty),
-    if (fallback != null && fallback.trim().isNotEmpty) fallback.trim(),
-  };
-  final List<String> normalized = unique.isEmpty
-      ? <String>[defaultValue]
-      : unique.toList(growable: false);
-  if (maxItems != null && normalized.length > maxItems) {
-    return normalized.take(maxItems).toList(growable: false);
-  }
-  return normalized;
 }

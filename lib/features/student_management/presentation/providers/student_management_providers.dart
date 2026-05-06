@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../../core/supabase/supabase_bootstrap.dart';
 import '../../data/repositories/supabase_student_management_repository.dart';
+import '../../data/services/backend_teacher_account_service.dart';
 import '../../data/services/supabase_school_admin_store.dart';
 import '../../data/services/supabase_service.dart';
 import '../../domain/entities/education_entities.dart';
@@ -87,11 +88,22 @@ final Provider<SupabaseSchoolAdminStore?> supabaseSchoolAdminStoreProvider =
       return SupabaseSchoolAdminStore(service);
     });
 
+final Provider<BackendTeacherAccountService?>
+backendTeacherAccountServiceProvider = Provider<BackendTeacherAccountService?>((
+  Ref ref,
+) {
+  if (ref.watch(supabaseServiceProvider) == null) {
+    return null;
+  }
+  return BackendTeacherAccountService();
+});
+
 final StateNotifierProvider<SchoolAdminController, SchoolAdminState>
 schoolAdminProvider =
     StateNotifierProvider<SchoolAdminController, SchoolAdminState>(
       (Ref ref) => SchoolAdminController(
         store: ref.watch(supabaseSchoolAdminStoreProvider),
+        teacherAccountService: ref.watch(backendTeacherAccountServiceProvider),
       ),
     );
 
@@ -154,15 +166,19 @@ final searchResultsProvider = Provider.family<List<SearchResultItem>, String>((
 });
 
 class SchoolAdminController extends StateNotifier<SchoolAdminState> {
-  SchoolAdminController({SupabaseSchoolAdminStore? store})
-    : _store = store,
-      super(_initialAdminState()) {
+  SchoolAdminController({
+    SupabaseSchoolAdminStore? store,
+    BackendTeacherAccountService? teacherAccountService,
+  }) : _store = store,
+       _teacherAccountService = teacherAccountService,
+       super(_initialAdminState()) {
     if (_store != null) {
       _hydrateFromSupabase();
     }
   }
 
   final SupabaseSchoolAdminStore? _store;
+  final BackendTeacherAccountService? _teacherAccountService;
 
   bool get hasLiveBackend => _store != null;
 
@@ -306,106 +322,6 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     );
   }
 
-  Future<void> registerUser(SignUpDraft draft, {String? password}) async {
-    if (_store != null && password != null && password.trim().isNotEmpty) {
-      final SupabaseSchoolAdminStore store = _store;
-      final SupabaseSchoolAdminAuthResult auth = await store.registerUser(
-        draft: draft,
-        password: password.trim(),
-        settings: state.settings,
-        resultWindow: state.resultWindow,
-      );
-      await _hydrateFromSupabase();
-      state = state.copyWith(
-        session: auth.session,
-        schoolName: draft.schoolName,
-        districtName: draft.districtName,
-        headmasterName: draft.role == UserRole.headOfSchool
-            ? draft.name
-            : state.headmasterName,
-      );
-      return;
-    }
-
-    if (draft.role == UserRole.teacher) {
-      final List<String> teacherSubjects = _normalizedAssignments(
-        draft.subjects,
-        fallback: draft.subject,
-        defaultValue: 'Basic Mathematics',
-        maxItems: 2,
-      );
-      final List<String> teacherClasses = _normalizedAssignments(
-        draft.assignedClasses,
-        fallback: draft.assignedClass,
-        defaultValue: 'Form 1 A',
-      );
-      final TeacherAccount teacher = TeacherAccount(
-        id: 'teacher-${state.teachers.length + 1}',
-        name: draft.name,
-        email: draft.email,
-        subject: teacherSubjects.first,
-        assignedClass: teacherClasses.first,
-        canUploadResults: true,
-        canEditResults: true,
-        subjects: teacherSubjects.skip(1).toList(growable: false),
-        assignedClasses: teacherClasses.skip(1).toList(growable: false),
-        canRegisterStudents: state.settings.allowTeacherStudentRegistration,
-        canDownloadResults: state.settings.allowTeacherResultDownloads,
-      );
-
-      state = state.copyWith(
-        schoolName: draft.schoolName,
-        districtName: draft.districtName,
-        teachers: <TeacherAccount>[...state.teachers, teacher],
-        session: SessionUser(
-          id: teacher.id,
-          name: teacher.name,
-          email: teacher.email,
-          role: UserRole.teacher,
-          schoolName: draft.schoolName,
-          districtName: draft.districtName,
-          subject: teacher.subject,
-          assignedClass: teacher.assignedClass,
-          subjects: teacher.effectiveSubjects,
-          assignedClasses: teacher.effectiveClasses,
-        ),
-      );
-      return;
-    }
-
-    if (draft.role == UserRole.academicMaster) {
-      state = state.copyWith(
-        schoolName: draft.schoolName,
-        districtName: draft.districtName,
-        session: SessionUser(
-          id: 'academic-master-1',
-          name: draft.name,
-          email: draft.email,
-          role: UserRole.academicMaster,
-          schoolName: draft.schoolName,
-          districtName: draft.districtName,
-        ),
-      );
-      _persistSettings();
-      return;
-    }
-
-    state = state.copyWith(
-      schoolName: draft.schoolName,
-      districtName: draft.districtName,
-      headmasterName: draft.name,
-      session: SessionUser(
-        id: 'headmaster-1',
-        name: draft.name,
-        email: draft.email,
-        role: UserRole.headOfSchool,
-        schoolName: draft.schoolName,
-        districtName: draft.districtName,
-      ),
-    );
-    _persistSettings();
-  }
-
   void logout() {
     state = state.copyWith(clearSession: true);
     if (_store != null) {
@@ -454,24 +370,36 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
 
     try {
       final String initialPassword = password?.trim() ?? '';
-      // If no password provided, always use saveTeacher (offline-friendly)
-      // If password provided, check if we have a real Supabase session
-      // If no real Supabase session, treat as offline and save locally
-      final bool shouldCreateWithPassword =
-          initialPassword.isNotEmpty && store.isAuthenticated;
 
-      final TeacherAccount savedTeacher = !shouldCreateWithPassword
-          ? await store.saveTeacher(
-              teacher: teacher,
-              schoolName: state.schoolName,
-              districtName: state.districtName,
-            )
-          : await store.createTeacherAccount(
-              teacher: teacher,
-              password: initialPassword,
-              schoolName: state.schoolName,
-              districtName: state.districtName,
-            );
+      if (initialPassword.isEmpty) {
+        throw StateError(
+          'Enter an initial password so the backend can create the teacher login.',
+        );
+      }
+
+      final String? accessToken = store.accessToken;
+      if (!store.isAuthenticated ||
+          accessToken == null ||
+          accessToken.isEmpty) {
+        throw StateError(
+          'The headmaster must be logged in before creating teacher accounts.',
+        );
+      }
+
+      final BackendTeacherAccountService? teacherAccountService =
+          _teacherAccountService;
+      if (teacherAccountService == null) {
+        throw StateError('FastAPI teacher account backend is not configured.');
+      }
+
+      final TeacherAccount savedTeacher = await teacherAccountService
+          .createTeacherAccount(
+            accessToken: accessToken,
+            teacher: teacher,
+            password: initialPassword,
+            schoolName: state.schoolName,
+            districtName: state.districtName,
+          );
       state = state.copyWith(
         teachers: <TeacherAccount>[
           for (final TeacherAccount current in state.teachers)
@@ -987,6 +915,19 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     final SupabaseSchoolAdminStore store = _store;
 
     _persist(() async {
+      final BackendTeacherAccountService? teacherAccountService =
+          _teacherAccountService;
+      final String? accessToken = store.accessToken;
+      if (teacherAccountService != null &&
+          accessToken != null &&
+          accessToken.isNotEmpty) {
+        await teacherAccountService.updateTeacherAccount(
+          accessToken: accessToken,
+          teacher: teacher,
+        );
+        return;
+      }
+
       await store.saveTeacher(
         teacher: teacher,
         schoolName: state.schoolName,

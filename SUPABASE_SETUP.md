@@ -51,22 +51,27 @@ You can either keep the values directly in `lib/main.dart` or pass them at runti
 
 ```bash
 flutter run \
-  --dart-define=SUPABASE_URL=https://your-project.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=your-anon-or-publishable-key
+  --dart-define=SUPABASE_URL=https://mnvspcycpbanqdrxrkgy.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1udnNwY3ljcGJhbnFkcnhya2d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTM2NzcsImV4cCI6MjA5MjA4OTY3N30.wH1WZ6fLtvFNWhcQZRFCpx3IRYT2QaA0-G6MEKdYf6U
 ```
 
 If no Supabase config is provided, the app starts in local empty-data mode.
 
-## 5. Auth setting required for easiest signup
+## 5. Auth setting required for account creation
 
 In Supabase dashboard:
 
 - open `Authentication`
 - open `Providers`
 - keep `Email` enabled
-- for the smoothest in-app signup flow, disable email confirmation while testing
+- disable public email signups
+- create teacher accounts only from the logged-in headmaster workflow
 
-If email confirmation stays enabled, Supabase may create the account but not start a logged-in session immediately.
+The FastAPI backend must have `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+The Flutter app sends the current headmaster Supabase access token to
+`POST /api/v1/admin/teachers`; the backend validates that profile as
+`head_of_school`, creates the Supabase Auth user with the service-role key, and
+writes the linked `public.users` and `public.teachers` rows.
 
 ## 6. What is now stored in Supabase
 
@@ -76,7 +81,6 @@ The app now saves and loads these live records from Supabase:
 - school settings and result deadlines
 - student registrations
 - subject result sheets and exam marks
-- signed-up user profiles
-- first-login auto-created profile for an existing Supabase auth user when no app profile exists yet
+- admin-created user profiles
 
 Creating the Supabase project alone does not add the tables automatically. You must run the migration SQL to create all fields used by this Flutter app.

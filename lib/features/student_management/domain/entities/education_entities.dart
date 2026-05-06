@@ -840,31 +840,6 @@ class SchoolOverview {
 }
 
 @immutable
-class SignUpDraft {
-  const SignUpDraft({
-    required this.name,
-    required this.email,
-    required this.role,
-    required this.schoolName,
-    required this.districtName,
-    this.subject,
-    this.assignedClass,
-    this.subjects = const <String>[],
-    this.assignedClasses = const <String>[],
-  });
-
-  final String name;
-  final String email;
-  final UserRole role;
-  final String schoolName;
-  final String districtName;
-  final String? subject;
-  final String? assignedClass;
-  final List<String> subjects;
-  final List<String> assignedClasses;
-}
-
-@immutable
 class SchoolAdminState {
   const SchoolAdminState({
     required this.session,

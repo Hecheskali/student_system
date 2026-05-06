@@ -447,40 +447,6 @@ class _LoginAuthCard extends StatelessWidget {
                     onTap: () => onRoleLogin(UserRole.headOfSchool),
                   ),
                 ],
-                const SizedBox(height: 20),
-                const Divider(),
-                const SizedBox(height: 16),
-                Text(
-                  hasLiveBackend ? 'Create an account' : 'Explore sign-up',
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  hasLiveBackend
-                      ? 'Choose the role you want to create and continue into the same school workflow after registration.'
-                      : 'These entry points let you test the role-specific onboarding screens before connecting the full live backend.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _SignUpShortcut(
-                  icon: Icons.person_add_alt_1_rounded,
-                  label: 'Teacher Sign Up',
-                  onPressed: () => context.go('/signup?role=teacher'),
-                ),
-                const SizedBox(height: 12),
-                _SignUpShortcut(
-                  icon: Icons.school_rounded,
-                  label: 'Academic Master Sign Up',
-                  onPressed: () => context.go('/signup?role=academicmaster'),
-                ),
-                const SizedBox(height: 12),
-                _SignUpShortcut(
-                  icon: Icons.manage_accounts_rounded,
-                  label: 'Headmaster Sign Up',
-                  onPressed: () => context.go('/signup?role=headmaster'),
-                ),
               ],
             ),
           ),
@@ -609,30 +575,6 @@ class _RoleButton extends StatelessWidget {
             Icon(Icons.arrow_forward_rounded, color: tone),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _SignUpShortcut extends StatelessWidget {
-  const _SignUpShortcut({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
       ),
     );
   }

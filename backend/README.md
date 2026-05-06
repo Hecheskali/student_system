@@ -34,8 +34,10 @@ cp .env.example .env
 ```
 
 4. Set a strong `JWT_SECRET_KEY`.
-5. Optionally set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`.
-6. Run the API:
+5. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` before using the
+   headmaster teacher-account endpoint.
+6. Optionally set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`.
+7. Run the API:
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -55,6 +57,8 @@ creates the first head-of-school admin on startup if it does not already exist.
 - `POST /api/v1/auth/logout`
 - `POST /api/v1/admin/users`
 - `GET /api/v1/admin/users`
+- `POST /api/v1/admin/teachers`
+- `PATCH /api/v1/admin/teachers/{teacher_id}`
 - `GET /api/v1/admin/audit-logs`
 
 ## Important note

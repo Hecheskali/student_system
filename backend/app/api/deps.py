@@ -1,19 +1,27 @@
 import uuid
-from datetime import UTC, datetime
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+    OAuth2PasswordBearer,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.core.security import decode_token
-from app.models.auth_security import UserSession
 from app.db.session import get_db
+from app.models.auth_security import UserSession
 from app.models.user import User, UserRole
+from app.services.supabase_admin import SupabaseAdminService, SupabasePrincipal
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+supabase_bearer_scheme = HTTPBearer(auto_error=True)
+supabase_admin_service = SupabaseAdminService()
 
 
 def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
@@ -40,7 +48,9 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication payload.",
         )
-    user = await db.scalar(select(User).where(User.id == _parse_uuid(user_id, "subject")))
+    user = await db.scalar(
+        select(User).where(User.id == _parse_uuid(user_id, "subject")),
+    )
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -74,7 +84,9 @@ async def get_current_session(
     if not session_id:
         return None
     parsed_session_id = _parse_uuid(session_id, "session")
-    return await db.scalar(select(UserSession).where(UserSession.id == parsed_session_id))
+    return await db.scalar(
+        select(UserSession).where(UserSession.id == parsed_session_id),
+    )
 
 
 def require_roles(*roles: UserRole) -> Callable[[User], Awaitable[User]]:
@@ -89,6 +101,21 @@ def require_roles(*roles: UserRole) -> Callable[[User], Awaitable[User]]:
         return current_user
 
     return dependency
+
+
+async def require_supabase_headmaster(
+    credentials: HTTPAuthorizationCredentials = Depends(supabase_bearer_scheme),
+) -> SupabasePrincipal:
+    principal = await run_in_threadpool(
+        supabase_admin_service.get_principal_from_access_token,
+        credentials.credentials,
+    )
+    if principal.role != UserRole.head_of_school.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the headmaster can manage teacher accounts.",
+        )
+    return principal
 
 
 def client_ip(request: Request) -> str:
