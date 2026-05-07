@@ -83,7 +83,11 @@ class Settings(BaseSettings):
         alias="TRUSTED_HOSTS",
     )
     allowed_origins: Annotated[list[str], NoDecode] = Field(
-        default_factory=lambda: ["http://localhost:3000"],
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://localhost:8080",
+            "https://student-flax-psi.vercel.app",
+        ],
         alias="ALLOWED_ORIGINS",
     )
     enable_https_redirect: bool = Field(

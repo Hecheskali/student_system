@@ -73,6 +73,14 @@ The Flutter app sends the current headmaster Supabase access token to
 `head_of_school`, creates the Supabase Auth user with the service-role key, and
 writes the linked `public.users` and `public.teachers` rows.
 
+For Vercel builds, set `BACKEND_API_URL` to the deployed FastAPI API root, for
+example `https://student-system-backend.onrender.com/api/v1`. The build script
+passes that value to Flutter with `--dart-define`; if it is missing, Vercel uses
+the Render service URL from this repo.
+
+If you override backend CORS with `ALLOWED_ORIGINS`, include the frontend origin
+too, for example `https://student-flax-psi.vercel.app`.
+
 ## 6. What is now stored in Supabase
 
 The app now saves and loads these live records from Supabase:

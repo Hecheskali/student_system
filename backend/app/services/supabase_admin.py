@@ -125,7 +125,7 @@ class SupabaseAdminService:
             payload.assigned_class,
             payload.assigned_classes,
         )
-        user_id: str | None = None
+        created_auth_user_id: str | None = None
 
         try:
             self._ensure_reference_data(
@@ -138,7 +138,13 @@ class SupabaseAdminService:
                 "teachers",
                 filters={"email": email, "school_name": school_name},
             )
-            if existing_teacher is not None:
+            existing_teacher_id = (
+                str(existing_teacher.get("id") or "") if existing_teacher else ""
+            )
+            existing_teacher_user_id = (
+                str(existing_teacher.get("user_id") or "") if existing_teacher else ""
+            )
+            if existing_teacher is not None and existing_teacher_user_id:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="A teacher profile with this email already exists.",
@@ -154,19 +160,55 @@ class SupabaseAdminService:
                 subjects=subjects,
                 assigned_classes=assigned_classes,
             )
-            auth_response = self.client.auth.admin.create_user(
-                {
-                    "email": email,
-                    "password": payload.password,
-                    "email_confirm": True,
-                    "user_metadata": metadata,
-                    "app_metadata": {"role": "teacher"},
-                },
-            )
-            auth_user = _response_user(auth_response)
+            auth_user = self._find_auth_user_by_email(email)
+            auth_user_was_created = False
+            if auth_user is None:
+                auth_response = self.client.auth.admin.create_user(
+                    {
+                        "email": email,
+                        "password": payload.password,
+                        "email_confirm": True,
+                        "user_metadata": metadata,
+                        "app_metadata": {"role": "teacher"},
+                    },
+                )
+                auth_user = _response_user(auth_response)
+                auth_user_was_created = True
             user_id = str(_get_attr(auth_user, "id", ""))
             if not user_id:
                 raise RuntimeError("Supabase did not return the created user id.")
+            if auth_user_was_created:
+                created_auth_user_id = user_id
+
+            existing_profile = self._fetch_single(
+                "users",
+                filters={"id": user_id},
+                select="id,email,role,school_name,district_name,profile",
+            )
+            if existing_profile is not None and not _is_compatible_teacher_profile(
+                existing_profile,
+                email=email,
+                school_name=school_name,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This email belongs to another application user.",
+                )
+
+            try:
+                self.client.auth.admin.update_user_by_id(
+                    user_id,
+                    {
+                        "email": email,
+                        "password": payload.password,
+                        "email_confirm": True,
+                        "user_metadata": metadata,
+                        "app_metadata": {"role": "teacher"},
+                    },
+                )
+            except Exception:
+                if existing_profile is not None:
+                    raise
 
             self._upsert(
                 "users",
@@ -181,42 +223,55 @@ class SupabaseAdminService:
                     "assigned_class": assigned_classes[0],
                     "subjects": subjects,
                     "assigned_classes": assigned_classes,
-                    "profile": {},
+                    "profile": _merged_profile(existing_profile, {}),
                 },
                 on_conflict="id",
             )
-            teacher_row = self._insert(
-                "teachers",
-                {
-                    "user_id": user_id,
-                    "name": payload.name,
-                    "email": email,
-                    "subject": subjects[0],
-                    "assigned_class": assigned_classes[0],
-                    "can_upload_results": payload.can_upload_results,
-                    "can_edit_results": payload.can_edit_results,
-                    "can_register_students": payload.can_register_students,
-                    "can_download_results": payload.can_download_results,
-                    "subjects": subjects[1:],
-                    "assigned_classes": assigned_classes[1:],
-                    "school_name": school_name,
-                    "district_name": district_name,
-                    "profile": {"is_active": payload.is_active},
-                },
-            )
+            teacher_payload = {
+                "user_id": user_id,
+                "name": payload.name,
+                "email": email,
+                "subject": subjects[0],
+                "assigned_class": assigned_classes[0],
+                "can_upload_results": payload.can_upload_results,
+                "can_edit_results": payload.can_edit_results,
+                "can_register_students": payload.can_register_students,
+                "can_download_results": payload.can_download_results,
+                "subjects": subjects[1:],
+                "assigned_classes": assigned_classes[1:],
+                "school_name": school_name,
+                "district_name": district_name,
+                "profile": _merged_profile(
+                    existing_teacher,
+                    {"is_active": payload.is_active},
+                ),
+            }
+            if existing_teacher_id:
+                teacher_row = self._update(
+                    "teachers",
+                    teacher_payload,
+                    filters={"id": existing_teacher_id},
+                )
+            else:
+                teacher_row = self._insert("teachers", teacher_payload)
             self._update(
                 "users",
-                {"profile": {"teacher_id": teacher_row["id"]}},
+                {
+                    "profile": _merged_profile(
+                        existing_profile,
+                        {"teacher_id": teacher_row["id"]},
+                    ),
+                },
                 filters={"id": user_id},
             )
             return _teacher_read_from_row(teacher_row)
         except HTTPException:
-            if user_id is not None:
-                self._delete_auth_user_safely(user_id)
+            if created_auth_user_id is not None:
+                self._delete_auth_user_safely(created_auth_user_id)
             raise
         except Exception as exc:
-            if user_id is not None:
-                self._delete_auth_user_safely(user_id)
+            if created_auth_user_id is not None:
+                self._delete_auth_user_safely(created_auth_user_id)
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Could not create teacher account in Supabase: {exc}",
@@ -443,6 +498,36 @@ class SupabaseAdminService:
         except Exception:
             pass
 
+    def _find_auth_user_by_email(self, email: str) -> Any | None:
+        normalized_email = email.strip().lower()
+        if not normalized_email:
+            return None
+
+        for page in range(1, 11):
+            try:
+                response = self.client.auth.admin.list_users(
+                    page=page,
+                    per_page=1000,
+                )
+            except TypeError:
+                if page > 1:
+                    return None
+                response = self.client.auth.admin.list_users()
+            except Exception:
+                return None
+
+            users = _response_users(response)
+            if not users:
+                return None
+            for user in users:
+                user_email = str(_get_attr(user, "email", "") or "").strip().lower()
+                if user_email == normalized_email:
+                    return user
+            if len(users) < 1000:
+                return None
+
+        return None
+
 
 def _ensure_headmaster(principal: SupabasePrincipal) -> None:
     if principal.role != "head_of_school":
@@ -528,6 +613,37 @@ def _teacher_read_from_row(row: dict[str, Any]) -> TeacherAccountRead:
     )
 
 
+def _merged_profile(
+    row: dict[str, Any] | None,
+    updates: dict[str, Any],
+) -> dict[str, Any]:
+    raw_profile = row.get("profile") if row else None
+    profile = dict(raw_profile) if isinstance(raw_profile, dict) else {}
+    profile.update(updates)
+    return profile
+
+
+def _is_compatible_teacher_profile(
+    profile: dict[str, Any],
+    *,
+    email: str,
+    school_name: str,
+) -> bool:
+    role = str(profile.get("role") or "").strip()
+    if role and role != "teacher":
+        return False
+
+    profile_email = str(profile.get("email") or "").strip().lower()
+    if profile_email and profile_email != email:
+        return False
+
+    profile_school = str(profile.get("school_name") or "").strip()
+    if profile_school and profile_school != school_name:
+        return False
+
+    return True
+
+
 def _effective_values(
     primary: str,
     extras: list[str],
@@ -583,6 +699,27 @@ def _response_data(response: Any) -> list[dict[str, Any]]:
     if isinstance(data, dict):
         return [dict(data)]
     return []
+
+
+def _response_users(response: Any) -> list[Any]:
+    if isinstance(response, list):
+        return response
+
+    users = _get_attr(response, "users", None)
+    if users is None:
+        users = _get_attr(response, "data", None)
+    if users is None and isinstance(response, dict):
+        users = response.get("users") or response.get("data")
+    if users is None:
+        return []
+    if isinstance(users, list):
+        return users
+    if isinstance(users, dict):
+        return []
+    try:
+        return list(users)
+    except TypeError:
+        return []
 
 
 def _get_attr(source: Any, name: str, default: Any) -> Any:

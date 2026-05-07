@@ -26,7 +26,19 @@ main() {
   ensure_flutter
   flutter config --enable-web
   flutter pub get
-  flutter build web --release --base-href=/
+
+  local dart_defines=()
+  if [[ -n "${SUPABASE_URL:-}" ]]; then
+    dart_defines+=(--dart-define="SUPABASE_URL=${SUPABASE_URL}")
+  fi
+  if [[ -n "${SUPABASE_ANON_KEY:-}" ]]; then
+    dart_defines+=(--dart-define="SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}")
+  fi
+  dart_defines+=(
+    --dart-define="BACKEND_API_URL=${BACKEND_API_URL:-https://student-system-backend.onrender.com/api/v1}"
+  )
+
+  flutter build web --release --base-href=/ "${dart_defines[@]}"
 }
 
 main "$@"
