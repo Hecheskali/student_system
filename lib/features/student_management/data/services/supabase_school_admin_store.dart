@@ -50,6 +50,33 @@ class SupabaseSchoolAdminStore {
 
   String? get accessToken => _service.currentSession?.accessToken;
 
+  Future<String> freshAccessToken({bool forceRefresh = false}) async {
+    final Session? currentSession = _service.currentSession;
+    if (currentSession == null) {
+      throw StateError('No active Supabase session.');
+    }
+
+    if (!forceRefresh && !currentSession.isExpired) {
+      return currentSession.accessToken;
+    }
+
+    final AuthResponse response;
+    try {
+      response = await _client.auth.refreshSession();
+    } on Object catch (error) {
+      throw StateError(
+        'The headmaster session expired. Please log in again. $error',
+      );
+    }
+    final Session? refreshedSession =
+        response.session ?? _service.currentSession;
+    final String? refreshedToken = refreshedSession?.accessToken;
+    if (refreshedToken == null || refreshedToken.isEmpty) {
+      throw StateError('The headmaster session expired. Please log in again.');
+    }
+    return refreshedToken;
+  }
+
   Future<SupabaseSchoolAdminLoadResult> load({
     required SchoolAdminState fallbackState,
   }) async {
@@ -107,16 +134,7 @@ class SupabaseSchoolAdminStore {
   }
 
   Future<void> refreshSession() async {
-    // Refresh the access token if needed
-    final Session? currentSession = _service.currentSession;
-    if (currentSession == null) {
-      throw Exception('No active session to refresh');
-    }
-    try {
-      await _client.auth.refreshSession();
-    } catch (e) {
-      throw Exception('Failed to refresh session: $e');
-    }
+    await freshAccessToken();
   }
 
   Future<void> ensureReferenceData({

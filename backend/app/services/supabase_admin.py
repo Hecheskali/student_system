@@ -75,9 +75,10 @@ class SupabaseAdminService:
             auth_response = self.client.auth.get_user(access_token)
             auth_user = _response_user(auth_response)
         except Exception as exc:
+            status_code, detail = _auth_lookup_error_response(exc)
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Supabase access token.",
+                status_code=status_code,
+                detail=detail,
             ) from exc
 
         user_id = str(_get_attr(auth_user, "id", ""))
@@ -720,6 +721,22 @@ def _response_users(response: Any) -> list[Any]:
         return list(users)
     except TypeError:
         return []
+
+
+def _auth_lookup_error_response(exc: Exception) -> tuple[int, str]:
+    message = str(exc).lower()
+    if "api key" in message or "apikey" in message:
+        return (
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Supabase backend credentials are invalid. Check SUPABASE_URL and "
+            "SUPABASE_SERVICE_ROLE_KEY.",
+        )
+    if "expired" in message:
+        return (
+            status.HTTP_401_UNAUTHORIZED,
+            "Supabase session expired. Please log in again.",
+        )
+    return status.HTTP_401_UNAUTHORIZED, "Invalid Supabase access token."
 
 
 def _get_attr(source: Any, name: str, default: Any) -> Any:

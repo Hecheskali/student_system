@@ -5,7 +5,11 @@ import pytest
 from fastapi import HTTPException
 
 from app.schemas.teachers import TeacherAccountCreate
-from app.services.supabase_admin import SupabaseAdminService, SupabasePrincipal
+from app.services.supabase_admin import (
+    SupabaseAdminService,
+    SupabasePrincipal,
+    _auth_lookup_error_response,
+)
 
 
 TEACHER_ID = "46e81f1b-340f-45eb-b5f0-fb88c3814aa2"
@@ -107,6 +111,20 @@ def _payload(email="legacy.teacher@example.com"):
         school_name="Summit View College",
         district_name="Jabu District",
     )
+
+
+def test_auth_lookup_error_response_distinguishes_backend_api_key_errors():
+    status_code, detail = _auth_lookup_error_response(Exception("Invalid API key"))
+
+    assert status_code == 503
+    assert "backend credentials" in detail
+
+
+def test_auth_lookup_error_response_distinguishes_expired_sessions():
+    status_code, detail = _auth_lookup_error_response(Exception("JWT expired"))
+
+    assert status_code == 401
+    assert "session expired" in detail
 
 
 def test_create_teacher_account_links_legacy_teacher_row():
