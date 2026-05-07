@@ -14,6 +14,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/v1/(.*)",
+      "destination": "https://student-system-h7pi.onrender.com/api/v1/$1"
+    },
     { "source": "/(.*)", "destination": "/" }
   ]
 }

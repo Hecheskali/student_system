@@ -35,7 +35,7 @@ main() {
     dart_defines+=(--dart-define="SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}")
   fi
   dart_defines+=(
-    --dart-define="BACKEND_API_URL=${BACKEND_API_URL:-https://student-system-backend.onrender.com/api/v1}"
+    --dart-define="BACKEND_API_URL=${BACKEND_API_URL:-/api/v1}"
   )
 
   flutter build web --release --base-href=/ "${dart_defines[@]}"
