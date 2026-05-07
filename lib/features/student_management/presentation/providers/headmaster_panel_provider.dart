@@ -434,6 +434,7 @@ class HeadmasterPanelController extends StateNotifier<HeadmasterPanelState> {
   void approveResult(String studentId, String studentName) {
     state = state.copyWith(
       approvedResultIds: <String>{...state.approvedResultIds, studentId},
+      
     );
     addAuditEvent(
       actor: 'Headmaster',

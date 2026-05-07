@@ -106,6 +106,19 @@ class SupabaseSchoolAdminStore {
     await _service.signOut();
   }
 
+  Future<void> refreshSession() async {
+    // Refresh the access token if needed
+    final Session? currentSession = _service.currentSession;
+    if (currentSession == null) {
+      throw Exception('No active session to refresh');
+    }
+    try {
+      await _client.auth.refreshSession();
+    } catch (e) {
+      throw Exception('Failed to refresh session: $e');
+    }
+  }
+
   Future<void> ensureReferenceData({
     required String schoolName,
     required String districtName,

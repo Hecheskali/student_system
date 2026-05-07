@@ -24,9 +24,7 @@ class SupabaseBootstrap {
       await Supabase.initialize(
         url: resolvedUrl,
         anonKey: resolvedAnonKey,
-        authOptions: const FlutterAuthClientOptions(
-          localStorage: EmptyLocalStorage(),
-        ),
+        authOptions: const FlutterAuthClientOptions(autoRefreshToken: true),
       );
     } on Exception catch (error, stackTrace) {
       debugPrint('Supabase initialization skipped: $error');

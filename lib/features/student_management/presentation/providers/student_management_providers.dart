@@ -377,12 +377,24 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
         );
       }
 
-      final String? accessToken = store.accessToken;
-      if (!store.isAuthenticated ||
-          accessToken == null ||
-          accessToken.isEmpty) {
+      if (!store.isAuthenticated) {
         throw StateError(
           'The headmaster must be logged in before creating teacher accounts.',
+        );
+      }
+
+      // Refresh the session to ensure token is valid (handles token expiration)
+      try {
+        await store.refreshSession();
+      } catch (e) {
+        debugPrint('Session refresh warning: $e');
+        // Continue anyway - if token is still invalid, backend will reject it
+      }
+
+      final String? accessToken = store.accessToken;
+      if (accessToken == null || accessToken.isEmpty) {
+        throw StateError(
+          'The headmaster session expired. Please log in again to create teacher accounts.',
         );
       }
 
