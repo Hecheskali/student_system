@@ -255,11 +255,18 @@ class SupabaseAdminService:
                 )
             else:
                 teacher_row = self._insert("teachers", teacher_payload)
+            
+            # Fetch the fresh profile after upsert to avoid merging stale data
+            current_profile = self._fetch_single(
+                "users",
+                filters={"id": user_id},
+                select="profile",
+            )
             self._update(
                 "users",
                 {
                     "profile": _merged_profile(
-                        existing_profile,
+                        current_profile,
                         {"teacher_id": teacher_row["id"]},
                     ),
                 },
