@@ -1,14 +1,17 @@
 import uuid
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from fastapi import HTTPException
 
+from app.core.config import Settings
 from app.schemas.teachers import TeacherAccountCreate
 from app.services.supabase_admin import (
     SupabaseAdminService,
     SupabasePrincipal,
     _auth_lookup_error_response,
+    _supabase_error_detail,
 )
 
 
@@ -125,6 +128,55 @@ def test_auth_lookup_error_response_distinguishes_expired_sessions():
 
     assert status_code == 401
     assert "session expired" in detail
+
+
+def test_auth_lookup_error_response_distinguishes_missing_backend_config():
+    status_code, detail = _auth_lookup_error_response(
+        Exception("Supabase admin client is not configured"),
+    )
+
+    assert status_code == 503
+    assert "backend credentials" in detail
+
+
+def test_supabase_error_detail_reads_auth_error_payload():
+    response = httpx.Response(
+        401,
+        json={"msg": "invalid JWT"},
+        request=httpx.Request("GET", "https://example.test/auth/v1/user"),
+    )
+
+    assert _supabase_error_detail(response) == "invalid JWT"
+
+
+def test_access_token_lookup_uses_supabase_auth_user_endpoint(monkeypatch):
+    captured = {}
+
+    def fake_get(url, *, headers, timeout):
+        captured["url"] = url
+        captured["headers"] = headers
+        captured["timeout"] = timeout
+        return httpx.Response(
+            200,
+            json={"id": TEACHER_USER_ID, "email": "head@example.com"},
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    service = SupabaseAdminService(
+        Settings(
+            SUPABASE_URL="https://project.supabase.co",
+            SUPABASE_SERVICE_ROLE_KEY="service-key",
+        ),
+    )
+
+    user = service._get_auth_user_from_access_token("user-token")
+
+    assert user["id"] == TEACHER_USER_ID
+    assert captured["url"] == "https://project.supabase.co/auth/v1/user"
+    assert captured["headers"]["apikey"] == "service-key"
+    assert captured["headers"]["Authorization"] == "Bearer user-token"
+    assert captured["timeout"] == 10
 
 
 def test_create_teacher_account_links_legacy_teacher_row():

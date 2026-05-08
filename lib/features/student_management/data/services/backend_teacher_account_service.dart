@@ -1,16 +1,12 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/education_entities.dart';
 
 class BackendTeacherAccountService {
-  BackendTeacherAccountService({
-    Dio? dio,
-    String baseUrl = const String.fromEnvironment(
-      'BACKEND_API_URL',
-      defaultValue: 'http://localhost:8000/api/v1',
-    ),
-  }) : _dio = dio ?? Dio(),
-       _baseUrl = baseUrl;
+  BackendTeacherAccountService({Dio? dio, String? baseUrl})
+    : _dio = dio ?? Dio(),
+      _baseUrl = _normalizeBaseUrl(baseUrl ?? _defaultBackendBaseUrl());
 
   final Dio _dio;
   final String _baseUrl;
@@ -85,6 +81,34 @@ class BackendTeacherAccountService {
       headers: <String, String>{'Authorization': 'Bearer $accessToken'},
     );
   }
+}
+
+String _defaultBackendBaseUrl() {
+  final String configured = const String.fromEnvironment(
+    'BACKEND_API_URL',
+  ).trim();
+  if (configured.isNotEmpty) {
+    return configured;
+  }
+
+  if (!kIsWeb) {
+    return 'http://localhost:8000/api/v1';
+  }
+
+  final String host = Uri.base.host.toLowerCase();
+  if (host == 'localhost' || host == '127.0.0.1' || host == '0.0.0.0') {
+    return 'http://localhost:8000/api/v1';
+  }
+
+  return '/api/v1';
+}
+
+String _normalizeBaseUrl(String baseUrl) {
+  final String trimmed = baseUrl.trim();
+  if (trimmed.endsWith('/')) {
+    return trimmed.substring(0, trimmed.length - 1);
+  }
+  return trimmed;
 }
 
 String _backendErrorMessage(DioException error) {

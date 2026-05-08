@@ -13,7 +13,7 @@ class SupabaseBootstrap {
 
     if (resolvedUrl.isEmpty || resolvedAnonKey.isEmpty) {
       debugPrint(
-        'Supabase config not found. Starting in local empty-data mode. '
+        'Supabase config not found. Live authentication is disabled. '
         'Provide inline values or SUPABASE_URL and SUPABASE_ANON_KEY '
         'with --dart-define.',
       );

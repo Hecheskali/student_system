@@ -361,12 +361,16 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     );
 
     if (_store == null) {
-      state = state.copyWith(
-        teachers: <TeacherAccount>[...state.teachers, teacher],
+      throw StateError(
+        'Supabase is not configured. Teacher accounts must be created in the live school system.',
       );
-      return;
     }
     final SupabaseSchoolAdminStore store = _store;
+    final BackendTeacherAccountService? teacherAccountService =
+        _teacherAccountService;
+    if (teacherAccountService == null) {
+      throw StateError('FastAPI teacher account backend is not configured.');
+    }
 
     try {
       final String initialPassword = password?.trim() ?? '';
@@ -383,46 +387,29 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
         );
       }
 
-      try {
-        final String accessToken = await store.freshAccessToken(
-          forceRefresh: true,
+      final TeacherAccount savedTeacher = await _createTeacherAccountWithRetry(
+        store: store,
+        teacherAccountService: teacherAccountService,
+        teacher: teacher,
+        password: initialPassword,
+      );
+      state = state.copyWith(
+        teachers: <TeacherAccount>[
+          for (final TeacherAccount current in state.teachers)
+            if (current.id != savedTeacher.id &&
+                current.email.toLowerCase() != savedTeacher.email.toLowerCase())
+              current,
+          savedTeacher,
+        ],
+      );
+      unawaited(_hydrateFromSupabase());
+    } on StateError catch (error) {
+      if (_isSessionExpiredError(error)) {
+        throw StateError(
+          'The headmaster session expired. Please log in again to create teacher accounts.',
         );
-        final BackendTeacherAccountService? teacherAccountService =
-            _teacherAccountService;
-        if (teacherAccountService == null) {
-          throw StateError(
-            'FastAPI teacher account backend is not configured.',
-          );
-        }
-
-        final TeacherAccount savedTeacher = await teacherAccountService
-            .createTeacherAccount(
-              accessToken: accessToken,
-              teacher: teacher,
-              password: initialPassword,
-              schoolName: state.schoolName,
-              districtName: state.districtName,
-            );
-        state = state.copyWith(
-          teachers: <TeacherAccount>[
-            for (final TeacherAccount current in state.teachers)
-              if (current.id != savedTeacher.id &&
-                  current.email.toLowerCase() !=
-                      savedTeacher.email.toLowerCase())
-                current,
-            savedTeacher,
-          ],
-        );
-      } on StateError catch (error) {
-        if (error.message.contains('Supabase session') ||
-            error.message.contains('headmaster session') ||
-            error.message.contains('active Supabase session')) {
-          throw StateError(
-            'The headmaster session expired. Please log in again to create teacher accounts.',
-          );
-        }
-        rethrow;
       }
+      rethrow;
     } on Object catch (error, stackTrace) {
       debugPrint('Saving teacher failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -556,7 +543,26 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     if (session != null &&
         session.role == UserRole.teacher &&
         session.id == teacherId) {
-      loginAs(UserRole.teacher, teacherId: teacherId);
+      final TeacherAccount? updatedTeacher = _teacherById(
+        state.teachers,
+        teacherId,
+      );
+      if (updatedTeacher != null) {
+        state = state.copyWith(
+          session: SessionUser(
+            id: updatedTeacher.id,
+            name: updatedTeacher.name,
+            email: updatedTeacher.email,
+            role: UserRole.teacher,
+            schoolName: state.schoolName,
+            districtName: state.districtName,
+            subject: updatedTeacher.subject,
+            assignedClass: updatedTeacher.assignedClass,
+            subjects: updatedTeacher.effectiveSubjects,
+            assignedClasses: updatedTeacher.effectiveClasses,
+          ),
+        );
+      }
     }
 
     _persistTeacherById(teacherId);
@@ -931,23 +937,72 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     _persist(() async {
       final BackendTeacherAccountService? teacherAccountService =
           _teacherAccountService;
-      if (teacherAccountService != null) {
-        final String accessToken = await store.freshAccessToken(
-          forceRefresh: true,
-        );
-        await teacherAccountService.updateTeacherAccount(
-          accessToken: accessToken,
-          teacher: teacher,
-        );
-        return;
+      if (teacherAccountService == null) {
+        throw StateError('FastAPI teacher account backend is not configured.');
       }
 
-      await store.saveTeacher(
+      await _updateTeacherAccountWithRetry(
+        store: store,
+        teacherAccountService: teacherAccountService,
         teacher: teacher,
+      );
+    });
+  }
+
+  Future<TeacherAccount> _createTeacherAccountWithRetry({
+    required SupabaseSchoolAdminStore store,
+    required BackendTeacherAccountService teacherAccountService,
+    required TeacherAccount teacher,
+    required String password,
+  }) async {
+    Future<TeacherAccount> submit(String accessToken) {
+      return teacherAccountService.createTeacherAccount(
+        accessToken: accessToken,
+        teacher: teacher,
+        password: password,
         schoolName: state.schoolName,
         districtName: state.districtName,
       );
-    });
+    }
+
+    final String accessToken = await store.freshAccessToken();
+    try {
+      return await submit(accessToken);
+    } on StateError catch (error) {
+      if (!_isSessionExpiredError(error)) {
+        rethrow;
+      }
+      final String refreshedAccessToken = await store.freshAccessToken(
+        forceRefresh: true,
+      );
+      return submit(refreshedAccessToken);
+    }
+  }
+
+  Future<TeacherAccount> _updateTeacherAccountWithRetry({
+    required SupabaseSchoolAdminStore store,
+    required BackendTeacherAccountService teacherAccountService,
+    required TeacherAccount teacher,
+  }) async {
+    Future<TeacherAccount> submit(String accessToken) {
+      return teacherAccountService.updateTeacherAccount(
+        accessToken: accessToken,
+        teacher: teacher,
+      );
+    }
+
+    final String accessToken = await store.freshAccessToken();
+    try {
+      return await submit(accessToken);
+    } on StateError catch (error) {
+      if (!_isSessionExpiredError(error)) {
+        rethrow;
+      }
+      final String refreshedAccessToken = await store.freshAccessToken(
+        forceRefresh: true,
+      );
+      return submit(refreshedAccessToken);
+    }
   }
 
   void _persistSettings() {
@@ -1527,6 +1582,15 @@ String _roleMismatchMessage(UserRole expectedRole) {
     case UserRole.headOfSchool:
       return 'Only headmasters can access this portal. Please use the teacher login for teacher accounts.';
   }
+}
+
+bool _isSessionExpiredError(Object error) {
+  final String message = error.toString().toLowerCase();
+  return message.contains('session expired') ||
+      message.contains('jwt expired') ||
+      message.contains('invalid supabase access token') ||
+      message.contains('active supabase session') ||
+      message.contains('headmaster session expired');
 }
 
 List<String> _normalizedAssignments(

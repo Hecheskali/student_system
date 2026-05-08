@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import Settings, get_settings
@@ -72,8 +73,7 @@ class SupabaseAdminService:
             )
 
         try:
-            auth_response = self.client.auth.get_user(access_token)
-            auth_user = _response_user(auth_response)
+            auth_user = self._get_auth_user_from_access_token(access_token)
         except Exception as exc:
             status_code, detail = _auth_lookup_error_response(exc)
             raise HTTPException(
@@ -529,6 +529,36 @@ class SupabaseAdminService:
 
         return None
 
+    def _get_auth_user_from_access_token(self, access_token: str) -> dict[str, Any]:
+        if (
+            not self._settings.supabase_url
+            or self._settings.supabase_service_role_key is None
+        ):
+            raise RuntimeError(
+                "Supabase admin client is not configured. Set SUPABASE_URL and "
+                "SUPABASE_SERVICE_ROLE_KEY.",
+            )
+
+        response = httpx.get(
+            f"{self._settings.supabase_url.rstrip('/')}/auth/v1/user",
+            headers={
+                "apikey": self._settings.supabase_service_role_key.get_secret_value(),
+                "Authorization": f"Bearer {access_token}",
+            },
+            timeout=10,
+        )
+        if response.status_code in (
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ):
+            detail = _supabase_error_detail(response)
+            raise RuntimeError(detail or "Invalid Supabase access token.")
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict):
+            raise RuntimeError("Supabase user lookup returned an invalid response.")
+        return data
+
 
 def _ensure_headmaster(principal: SupabasePrincipal) -> None:
     if principal.role != "head_of_school":
@@ -725,7 +755,12 @@ def _response_users(response: Any) -> list[Any]:
 
 def _auth_lookup_error_response(exc: Exception) -> tuple[int, str]:
     message = str(exc).lower()
-    if "api key" in message or "apikey" in message:
+    if (
+        "api key" in message
+        or "apikey" in message
+        or "not configured" in message
+        or "service_role_key" in message
+    ):
         return (
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "Supabase backend credentials are invalid. Check SUPABASE_URL and "
@@ -737,6 +772,19 @@ def _auth_lookup_error_response(exc: Exception) -> tuple[int, str]:
             "Supabase session expired. Please log in again.",
         )
     return status.HTTP_401_UNAUTHORIZED, "Invalid Supabase access token."
+
+
+def _supabase_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        return response.text.strip()
+    if isinstance(payload, dict):
+        for key in ("msg", "message", "error_description", "error"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return ""
 
 
 def _get_attr(source: Any, name: str, default: Any) -> Any:

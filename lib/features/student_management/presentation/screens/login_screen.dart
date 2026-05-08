@@ -111,7 +111,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       });
                                     },
                                     onSubmit: _submitLiveLogin,
-                                    onRoleLogin: _handlePreviewRoleLogin,
                                   ),
                                 ],
                               );
@@ -144,7 +143,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         });
                                       },
                                       onSubmit: _submitLiveLogin,
-                                      onRoleLogin: _handlePreviewRoleLogin,
                                     ),
                                   ),
                                 ],
@@ -160,11 +158,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       ),
     );
-  }
-
-  void _handlePreviewRoleLogin(UserRole role) {
-    ref.read(schoolAdminProvider.notifier).loginAs(role);
-    context.go('/dashboard');
   }
 
   Future<void> _submitLiveLogin() async {
@@ -315,7 +308,6 @@ class _LoginAuthCard extends StatelessWidget {
     required this.passwordFocusNode,
     required this.onPasswordVisibilityToggle,
     required this.onSubmit,
-    required this.onRoleLogin,
   });
 
   final GlobalKey<FormState> formKey;
@@ -328,7 +320,6 @@ class _LoginAuthCard extends StatelessWidget {
   final FocusNode passwordFocusNode;
   final VoidCallback onPasswordVisibilityToggle;
   final VoidCallback onSubmit;
-  final ValueChanged<UserRole> onRoleLogin;
 
   @override
   Widget build(BuildContext context) {
@@ -348,105 +339,82 @@ class _LoginAuthCard extends StatelessWidget {
                 _ModeBadge(hasLiveBackend: hasLiveBackend),
                 const SizedBox(height: 18),
                 Text(
-                  hasLiveBackend ? 'Welcome back' : 'Preview login paths',
+                  hasLiveBackend ? 'Welcome back' : 'Live auth not configured',
                   style: theme.textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 10),
                 Text(
                   hasLiveBackend
-                      ? 'Sign in with your school email and password, then continue into the dashboard. New users can create an account from the shortcuts below.'
-                      : 'Supabase is not active in this preview, so you can enter through the role shortcuts below or open the sign-up flow to test the experience.',
+                      ? 'Sign in with the school email and password created by the headmaster.'
+                      : 'Supabase is required for this system. Set SUPABASE_URL and SUPABASE_ANON_KEY before anyone can sign in.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFF475569),
                   ),
                 ),
                 const SizedBox(height: 22),
-                if (hasLiveBackend) ...<Widget>[
-                  TextFormField(
-                    controller: emailController,
-                    focusNode: emailFocusNode,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const <String>[AutofillHints.username],
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'name@school.edu',
-                      prefixIcon: Icon(Icons.mail_rounded),
-                    ),
-                    validator: _validateEmail,
-                    onFieldSubmitted: (_) => passwordFocusNode.requestFocus(),
-                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                TextFormField(
+                  controller: emailController,
+                  focusNode: emailFocusNode,
+                  enabled: hasLiveBackend,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const <String>[AutofillHints.username],
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    hintText: 'name@school.edu',
+                    prefixIcon: Icon(Icons.mail_rounded),
                   ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: passwordController,
-                    focusNode: passwordFocusNode,
-                    obscureText: !isPasswordVisible,
-                    textInputAction: TextInputAction.done,
-                    autofillHints: const <String>[AutofillHints.password],
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_rounded),
-                      suffixIcon: IconButton(
-                        onPressed: onPasswordVisibilityToggle,
-                        icon: Icon(
-                          isPasswordVisible
-                              ? Icons.visibility_rounded
-                              : Icons.visibility_off_rounded,
-                        ),
-                      ),
-                    ),
-                    validator: _validatePassword,
-                    onFieldSubmitted: (_) => onSubmit(),
-                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: isSubmitting ? null : onSubmit,
-                      icon: isSubmitting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.login_rounded),
-                      label: Text(
-                        isSubmitting ? 'Signing in...' : 'Login to Dashboard',
+                  validator: hasLiveBackend ? _validateEmail : null,
+                  onFieldSubmitted: (_) => passwordFocusNode.requestFocus(),
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: passwordController,
+                  focusNode: passwordFocusNode,
+                  enabled: hasLiveBackend,
+                  obscureText: !isPasswordVisible,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const <String>[AutofillHints.password],
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(Icons.lock_rounded),
+                    suffixIcon: IconButton(
+                      onPressed: hasLiveBackend
+                          ? onPasswordVisibilityToggle
+                          : null,
+                      icon: Icon(
+                        isPasswordVisible
+                            ? Icons.visibility_rounded
+                            : Icons.visibility_off_rounded,
                       ),
                     ),
                   ),
-                ] else ...<Widget>[
-                  _RoleButton(
-                    title: 'Academic Master Login',
-                    description:
-                        'Manage exam uploads, review results, set deadlines, and oversee academic performance.',
-                    icon: Icons.school_rounded,
-                    tone: const Color(0xFF7C3AED),
-                    onTap: () => onRoleLogin(UserRole.academicMaster),
+                  validator: hasLiveBackend ? _validatePassword : null,
+                  onFieldSubmitted: (_) => onSubmit(),
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: !hasLiveBackend || isSubmitting
+                        ? null
+                        : onSubmit,
+                    icon: isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.login_rounded),
+                    label: Text(
+                      isSubmitting ? 'Signing in...' : 'Login to Dashboard',
+                    ),
                   ),
-                  const SizedBox(height: 14),
-                  _RoleButton(
-                    title: 'Teacher Login',
-                    description:
-                        'Open the teacher workspace for score uploads, student management, and personal result permissions.',
-                    icon: Icons.cast_for_education_rounded,
-                    tone: const Color(0xFF155EEF),
-                    onTap: () => onRoleLogin(UserRole.teacher),
-                  ),
-                  const SizedBox(height: 14),
-                  _RoleButton(
-                    title: 'Headmaster Login',
-                    description:
-                        'Add or remove teachers, monitor operations, and manage school-wide access.',
-                    icon: Icons.admin_panel_settings_rounded,
-                    tone: const Color(0xFF0F766E),
-                    onTap: () => onRoleLogin(UserRole.headOfSchool),
-                  ),
-                ],
+                ),
               ],
             ),
           ),
@@ -500,81 +468,18 @@ class _ModeBadge extends StatelessWidget {
           Icon(
             hasLiveBackend
                 ? Icons.cloud_done_rounded
-                : Icons.visibility_rounded,
+                : Icons.warning_amber_rounded,
             size: 18,
             color: tone,
           ),
           const SizedBox(width: 8),
           Text(
-            hasLiveBackend ? 'Live School Auth System' : 'Preview Mode',
+            hasLiveBackend ? 'Live School Auth System' : 'Auth Not Configured',
             style: Theme.of(
               context,
             ).textTheme.labelLarge?.copyWith(color: tone),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _RoleButton extends StatelessWidget {
-  const _RoleButton({
-    required this.title,
-    required this.description,
-    required this.icon,
-    required this.tone,
-    required this.onTap,
-  });
-
-  final String title;
-  final String description;
-  final IconData icon;
-  final Color tone;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Ink(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: tone.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Icon(icon, color: tone),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(title, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 6),
-                  Text(
-                    description,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF475569),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Icon(Icons.arrow_forward_rounded, color: tone),
-          ],
-        ),
       ),
     );
   }

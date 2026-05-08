@@ -1491,7 +1491,7 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
                               action: 'Added teacher',
                               target: name,
                               detail:
-                                  'Teacher account registered in the panel.',
+                                  'Teacher login account created and linked to the teacher profile.',
                             );
                             keepDialogOpen = false;
                             if (dialogContext.mounted) {
@@ -1521,7 +1521,7 @@ class _HeadmasterPanelScreenState extends ConsumerState<HeadmasterPanelScreen> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(editing ? 'Save' : 'Create'),
+                      : Text(editing ? 'Save' : 'Create Account'),
                 ),
               ],
             );
