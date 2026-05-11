@@ -11,8 +11,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseBootstrap.initialize(
     url: 'https://mnvspcycpbanqdrxrkgy.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1udnNwY3ljcGJhbnFkcnhya2d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTM2NzcsImV4cCI6MjA5MjA4OTY3N30.wH1WZ6fLtvFNWhcQZRFCpx3IRYT2QaA0-G6MEKdYf6U',
+    anonKey: 'sb_publishable_VpBQlmnFXh66ExZPtWJOhA_bZbHGh-E',
   );
   runApp(const ProviderScope(child: StudentSystemApp()));
 }

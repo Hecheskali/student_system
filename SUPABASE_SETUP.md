@@ -52,7 +52,7 @@ You can either keep the values directly in `lib/main.dart` or pass them at runti
 ```bash
 flutter run \
   --dart-define=SUPABASE_URL=https://mnvspcycpbanqdrxrkgy.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1udnNwY3ljcGJhbnFkcnhya2d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTM2NzcsImV4cCI6MjA5MjA4OTY3N30.wH1WZ6fLtvFNWhcQZRFCpx3IRYT2QaA0-G6MEKdYf6U
+  --dart-define=SUPABASE_ANON_KEY=sb_publishable_VpBQlmnFXh66ExZPtWJOhA_bZbHGh-E
 ```
 
 If no Supabase config is provided, the app starts in local empty-data mode.
@@ -73,9 +73,10 @@ The Flutter app sends the current headmaster Supabase access token to
 `head_of_school`, creates the Supabase Auth user with the service-role key, and
 writes the linked `public.users` and `public.teachers` rows.
 
-For Vercel builds, set `BACKEND_API_URL` to `/api/v1`. Vercel rewrites that
-same-origin path to the deployed Render backend, so browser requests avoid CORS
-problems on deployment-specific Vercel URLs.
+For Vercel builds, set `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the frontend
+Supabase project settings. `SUPABASE_KEY` is also accepted by the build script
+as an alias for `SUPABASE_ANON_KEY`. `BACKEND_API_URL` should point to
+`https://student-system-h7pi.onrender.com/api/v1`.
 
 If you override backend CORS with `ALLOWED_ORIGINS`, include the frontend origin
 too, for example `https://student-flax-psi.vercel.app`. Vercel deployment URLs

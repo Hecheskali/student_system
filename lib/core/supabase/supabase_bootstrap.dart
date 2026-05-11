@@ -6,15 +6,20 @@ class SupabaseBootstrap {
     final String resolvedUrl = (url != null && url.trim().isNotEmpty)
         ? url.trim()
         : const String.fromEnvironment('SUPABASE_URL');
+    const String anonKeyDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
+    const String publishableKeyDefine = String.fromEnvironment('SUPABASE_KEY');
     final String resolvedAnonKey =
         (anonKey != null && anonKey.trim().isNotEmpty)
         ? anonKey.trim()
-        : const String.fromEnvironment('SUPABASE_ANON_KEY');
+        : anonKeyDefine.isNotEmpty
+        ? anonKeyDefine
+        : publishableKeyDefine;
 
     if (resolvedUrl.isEmpty || resolvedAnonKey.isEmpty) {
       debugPrint(
         'Supabase config not found. Live authentication is disabled. '
-        'Provide inline values or SUPABASE_URL and SUPABASE_ANON_KEY '
+        'Provide inline values or SUPABASE_URL plus SUPABASE_ANON_KEY '
+        'or SUPABASE_KEY '
         'with --dart-define.',
       );
       return;

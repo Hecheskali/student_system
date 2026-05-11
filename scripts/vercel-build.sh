@@ -31,8 +31,9 @@ main() {
   if [[ -n "${SUPABASE_URL:-}" ]]; then
     dart_defines+=(--dart-define="SUPABASE_URL=${SUPABASE_URL}")
   fi
-  if [[ -n "${SUPABASE_ANON_KEY:-}" ]]; then
-    dart_defines+=(--dart-define="SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}")
+  local supabase_anon_key="${SUPABASE_ANON_KEY:-${SUPABASE_KEY:-}}"
+  if [[ -n "${supabase_anon_key}" ]]; then
+    dart_defines+=(--dart-define="SUPABASE_ANON_KEY=${supabase_anon_key}")
   fi
   dart_defines+=(
     --dart-define="BACKEND_API_URL=${BACKEND_API_URL:-https://student-system-h7pi.onrender.com/api/v1}"
