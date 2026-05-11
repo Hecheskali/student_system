@@ -99,11 +99,25 @@ class SupabaseAdminService:
                 detail="Signed-in user does not have an application profile.",
             )
 
+        auth_role = _normalize_role(_auth_user_role(auth_user))
+        profile_role = _normalize_role(profile.get("role"))
+        if auth_role and profile_role and auth_role != profile_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Supabase auth role does not match the application profile.",
+            )
+        role = profile_role or auth_role
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Signed-in user does not have an application role.",
+            )
+
         return SupabasePrincipal(
             id=user_id,
             email=str(profile.get("email") or _get_attr(auth_user, "email", "")),
             name=str(profile.get("name") or ""),
-            role=str(profile.get("role") or ""),
+            role=role,
             school_name=str(profile.get("school_name") or ""),
             district_name=str(profile.get("district_name") or ""),
         )
@@ -628,6 +642,23 @@ def _teacher_metadata(
         "subjects": subjects,
         "assigned_classes": assigned_classes,
     }
+
+
+def _auth_user_role(auth_user: Any) -> str:
+    app_metadata = _get_attr(auth_user, "app_metadata", None)
+    if isinstance(app_metadata, dict):
+        role = app_metadata.get("role")
+        if role is not None:
+            return str(role)
+
+    return ""
+
+
+def _normalize_role(value: Any) -> str:
+    normalized = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if normalized in {"headmaster", "headofschool", "head_of_school"}:
+        return "head_of_school"
+    return normalized
 
 
 def _teacher_read_from_row(row: dict[str, Any]) -> TeacherAccountRead:

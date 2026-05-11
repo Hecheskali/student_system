@@ -179,6 +179,66 @@ def test_access_token_lookup_uses_supabase_auth_user_endpoint(monkeypatch):
     assert captured["timeout"] == 10
 
 
+def test_principal_accepts_headmaster_app_metadata_alias(monkeypatch):
+    service = StubSupabaseAdminService(
+        teachers=[],
+        users=[
+            {
+                "id": OTHER_USER_ID,
+                "email": "head@example.com",
+                "name": "Headmaster",
+                "role": "head_of_school",
+                "school_name": "Summit View College",
+                "district_name": "Jabu District",
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        service,
+        "_get_auth_user_from_access_token",
+        lambda _: {
+            "id": OTHER_USER_ID,
+            "email": "head@example.com",
+            "app_metadata": {"role": "headmaster"},
+        },
+    )
+
+    principal = service.get_principal_from_access_token("headmaster-token")
+
+    assert principal.id == OTHER_USER_ID
+    assert principal.role == "head_of_school"
+
+
+def test_principal_rejects_auth_profile_role_mismatch(monkeypatch):
+    service = StubSupabaseAdminService(
+        teachers=[],
+        users=[
+            {
+                "id": OTHER_USER_ID,
+                "email": "head@example.com",
+                "name": "Headmaster",
+                "role": "head_of_school",
+                "school_name": "Summit View College",
+                "district_name": "Jabu District",
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        service,
+        "_get_auth_user_from_access_token",
+        lambda _: {
+            "id": OTHER_USER_ID,
+            "email": "head@example.com",
+            "app_metadata": {"role": "teacher"},
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.get_principal_from_access_token("teacher-token")
+
+    assert exc_info.value.status_code == 403
+
+
 def test_create_teacher_account_links_legacy_teacher_row():
     service = StubSupabaseAdminService(
         teachers=[

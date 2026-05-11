@@ -34,7 +34,15 @@ class InputSanitizationMiddleware(BaseHTTPMiddleware):
         """Validate request before processing."""
         
         # Check method
-        if request.method not in ["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH"]:
+        if request.method not in [
+            "GET",
+            "HEAD",
+            "POST",
+            "PUT",
+            "DELETE",
+            "PATCH",
+            "OPTIONS",
+        ]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid HTTP method",
