@@ -9,7 +9,8 @@ abstract class ReportConfig {
   /// Backend API base URL for report generation
   ///
   /// Only used if useBackendForReports is true
-  static const String backendReportApiUrl = 'http://localhost:8000/api/v1';
+  static const String backendReportApiUrl =
+      'https://student-system-h7pi.onrender.com/api/v1';
 
   /// Timeout duration for backend report requests (in seconds)
   static const int reportRequestTimeout = 60;

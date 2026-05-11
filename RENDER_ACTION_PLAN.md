@@ -261,7 +261,7 @@ async def generate_streaming_pdf(
 
 ```bash
 # After deploying to Render, curl:
-curl https://student-system-backend.onrender.com/health/ready
+curl https://student-system-h7pi.onrender.com/health/ready
 
 # Should return:
 # {"status": "ready", "database": true, "timestamp": "..."}

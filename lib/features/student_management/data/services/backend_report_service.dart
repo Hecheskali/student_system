@@ -10,7 +10,7 @@ class BackendReportService {
 
   BackendReportService({
     required Dio dio,
-    String baseUrl = 'http://localhost:8000/api/v1',
+    String baseUrl = 'https://student-system-h7pi.onrender.com/api/v1',
   }) : _dio = dio,
        _baseUrl = baseUrl;
 

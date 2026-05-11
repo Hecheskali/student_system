@@ -3,6 +3,9 @@
   "buildCommand": "bash ./scripts/vercel-build.sh",
   "outputDirectory": "build/web",
   "cleanUrls": true,
+  "env": {
+    "BACKEND_API_URL": "https://student-system-h7pi.onrender.com/api/v1"
+  },
   "headers": [
     {
       "source": "/(.*)",

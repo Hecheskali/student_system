@@ -197,7 +197,7 @@ git push origin main
 ### Check 1: Health Endpoint
 
 ```bash
-curl https://student-system-backend.onrender.com/health/ready
+curl https://student-system-h7pi.onrender.com/health/ready
 
 # Expected response:
 # {"status": "ready", "database": true}
@@ -213,7 +213,7 @@ curl https://student-system-backend.onrender.com/health/ready
 ### Check 3: Login Test
 
 ```bash
-curl -X POST https://student-system-backend.onrender.com/api/v1/auth/login \
+curl -X POST https://student-system-h7pi.onrender.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "admin@school.edu", "password": "SecurePass123!@#"}'
 
@@ -225,7 +225,7 @@ curl -X POST https://student-system-backend.onrender.com/api/v1/auth/login \
 ```bash
 # Login 6 times in quick succession
 for i in {1..6}; do
-  curl -X POST https://student-system-backend.onrender.com/api/v1/auth/login \
+  curl -X POST https://student-system-h7pi.onrender.com/api/v1/auth/login \
     -H "Content-Type: application/json" \
     -d '{"email": "test@test.com", "password": "wrong"}'
   sleep 0.1
@@ -278,7 +278,7 @@ done
 
 ```bash
 # 1. Verify HTTPS works
-curl -I https://student-system-backend.onrender.com
+curl -I https://student-system-h7pi.onrender.com
 # Should show: Strict-Transport-Security header
 
 # 2. Test auth flow
@@ -288,10 +288,10 @@ curl -I https://student-system-backend.onrender.com
 # All should work without errors
 
 # 3. Check security headers
-curl -I https://student-system-backend.onrender.com/api/v1/auth/login | grep -i security
+curl -I https://student-system-h7pi.onrender.com/api/v1/auth/login | grep -i security
 
 # 4. Verify docs disabled
-curl https://student-system-backend.onrender.com/docs
+curl https://student-system-h7pi.onrender.com/docs
 # Should return 404
 ```
 

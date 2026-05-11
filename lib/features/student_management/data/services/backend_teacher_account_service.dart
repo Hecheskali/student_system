@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/education_entities.dart';
 
+const String _productionBackendApiUrl =
+    'https://student-system-h7pi.onrender.com/api/v1';
+
 class BackendTeacherAccountService {
   BackendTeacherAccountService({Dio? dio, String? baseUrl})
     : _dio = dio ?? Dio(),
@@ -100,7 +103,7 @@ String _defaultBackendBaseUrl() {
     return 'http://localhost:8000/api/v1';
   }
 
-  return '/api/v1';
+  return _productionBackendApiUrl;
 }
 
 String _normalizeBaseUrl(String baseUrl) {
