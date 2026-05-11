@@ -346,20 +346,6 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
       assignedClasses,
       defaultValue: 'Form 1 A',
     );
-    final TeacherAccount teacher = TeacherAccount(
-      id: 'teacher-${state.teachers.length + 1}',
-      name: name,
-      email: email,
-      subject: normalizedSubjects.first,
-      assignedClass: normalizedClasses.first,
-      canUploadResults: true,
-      canEditResults: true,
-      subjects: normalizedSubjects.skip(1).toList(growable: false),
-      assignedClasses: normalizedClasses.skip(1).toList(growable: false),
-      canRegisterStudents: state.settings.allowTeacherStudentRegistration,
-      canDownloadResults: state.settings.allowTeacherResultDownloads,
-    );
-
     if (_store == null) {
       throw StateError(
         'Supabase is not configured. Teacher accounts must be created in the live school system.',
@@ -387,22 +373,32 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
         );
       }
 
+      final TeacherAccount teacherDraft = TeacherAccount(
+        id: '',
+        name: name.trim(),
+        email: email.trim(),
+        subject: normalizedSubjects.first,
+        assignedClass: normalizedClasses.first,
+        canUploadResults: true,
+        canEditResults: true,
+        subjects: normalizedSubjects.skip(1).toList(growable: false),
+        assignedClasses: normalizedClasses.skip(1).toList(growable: false),
+        canRegisterStudents: state.settings.allowTeacherStudentRegistration,
+        canDownloadResults: state.settings.allowTeacherResultDownloads,
+      );
       final TeacherAccount savedTeacher = await _createTeacherAccountWithRetry(
         store: store,
         teacherAccountService: teacherAccountService,
-        teacher: teacher,
+        teacher: teacherDraft,
         password: initialPassword,
       );
       state = state.copyWith(
         teachers: <TeacherAccount>[
           for (final TeacherAccount current in state.teachers)
-            if (current.id != savedTeacher.id &&
-                current.email.toLowerCase() != savedTeacher.email.toLowerCase())
-              current,
+            if (!_sameTeacherIdentity(current, savedTeacher)) current,
           savedTeacher,
         ],
       );
-      unawaited(_hydrateFromSupabase());
     } on StateError catch (error) {
       if (_isSessionExpiredError(error)) {
         throw StateError(
@@ -1591,6 +1587,18 @@ bool _isSessionExpiredError(Object error) {
       message.contains('invalid supabase access token') ||
       message.contains('active supabase session') ||
       message.contains('headmaster session expired');
+}
+
+bool _sameTeacherIdentity(TeacherAccount current, TeacherAccount saved) {
+  final String currentId = current.id.trim();
+  final String savedId = saved.id.trim();
+  if (currentId.isNotEmpty && savedId.isNotEmpty && currentId == savedId) {
+    return true;
+  }
+
+  final String savedEmail = saved.email.trim().toLowerCase();
+  return savedEmail.isNotEmpty &&
+      current.email.trim().toLowerCase() == savedEmail;
 }
 
 List<String> _normalizedAssignments(
