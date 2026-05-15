@@ -386,11 +386,16 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
         canRegisterStudents: state.settings.allowTeacherStudentRegistration,
         canDownloadResults: state.settings.allowTeacherResultDownloads,
       );
-      final TeacherAccount savedTeacher = await _createTeacherAccountWithRetry(
+      final TeacherAccount backendTeacher = await _createTeacherAccountWithRetry(
         store: store,
         teacherAccountService: teacherAccountService,
         teacher: teacherDraft,
         password: initialPassword,
+      );
+      final TeacherAccount savedTeacher = await store.saveTeacher(
+        teacher: backendTeacher,
+        schoolName: state.schoolName,
+        districtName: state.districtName,
       );
       state = state.copyWith(
         teachers: <TeacherAccount>[
