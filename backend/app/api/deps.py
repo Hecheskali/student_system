@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.core.security import decode_token
+from app.core.time import is_before_now
 from app.db.session import get_db
 from app.models.auth_security import UserSession
 from app.models.user import User, UserRole
@@ -67,7 +68,7 @@ async def get_current_user(
             or session.user_id != user.id
             or session.revoked_at is not None
             or session.compromised_at is not None
-            or session.expires_at < datetime.now(UTC)
+            or is_before_now(session.expires_at)
         ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

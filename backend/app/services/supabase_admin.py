@@ -159,11 +159,6 @@ class SupabaseAdminService:
             existing_teacher_user_id = (
                 str(existing_teacher.get("user_id") or "") if existing_teacher else ""
             )
-            if existing_teacher is not None and existing_teacher_user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="A teacher profile with this email already exists.",
-                )
 
             metadata = _teacher_metadata(
                 name=payload.name,
@@ -177,7 +172,17 @@ class SupabaseAdminService:
             )
             auth_user = self._find_auth_user_by_email(email)
             auth_user_was_created = False
-            if auth_user is None:
+            if auth_user is not None and existing_teacher_user_id:
+                auth_user_id = str(_get_attr(auth_user, "id", ""))
+                if auth_user_id and auth_user_id != existing_teacher_user_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="This email belongs to another Supabase auth user.",
+                    )
+
+            if existing_teacher_user_id:
+                user_id = existing_teacher_user_id
+            elif auth_user is None:
                 auth_response = self.client.auth.admin.create_user(
                     {
                         "email": email,
@@ -189,7 +194,9 @@ class SupabaseAdminService:
                 )
                 auth_user = _response_user(auth_response)
                 auth_user_was_created = True
-            user_id = str(_get_attr(auth_user, "id", ""))
+                user_id = str(_get_attr(auth_user, "id", ""))
+            else:
+                user_id = str(_get_attr(auth_user, "id", ""))
             if not user_id:
                 raise RuntimeError("Supabase did not return the created user id.")
             if auth_user_was_created:
@@ -205,10 +212,17 @@ class SupabaseAdminService:
                 email=email,
                 school_name=school_name,
             ):
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="This email belongs to another application user.",
-                )
+                if not _is_repairable_linked_teacher_profile(
+                    existing_profile,
+                    email=email,
+                    school_name=school_name,
+                    teacher_id=existing_teacher_id,
+                    linked_user_id=existing_teacher_user_id,
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="This email belongs to another application user.",
+                    )
 
             try:
                 self.client.auth.admin.update_user_by_id(
@@ -376,6 +390,11 @@ class SupabaseAdminService:
         )
         user_id = str(teacher_row.get("user_id") or "")
         if user_id:
+            current_profile = self._fetch_single(
+                "users",
+                filters={"id": user_id},
+                select="profile",
+            )
             metadata = _teacher_metadata(
                 name=name,
                 email=email,
@@ -399,7 +418,10 @@ class SupabaseAdminService:
                     "assigned_class": assigned_classes[0],
                     "subjects": subjects,
                     "assigned_classes": assigned_classes,
-                    "profile": {"teacher_id": str(teacher_id)},
+                    "profile": _merged_profile(
+                        current_profile,
+                        {"teacher_id": str(teacher_id)},
+                    ),
                 },
                 on_conflict="id",
             )
@@ -658,6 +680,8 @@ def _normalize_role(value: Any) -> str:
     normalized = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
     if normalized in {"headmaster", "headofschool", "head_of_school"}:
         return "head_of_school"
+    if normalized in {"academicmaster", "academic_master"}:
+        return "academic_master"
     return normalized
 
 
@@ -700,6 +724,32 @@ def _is_compatible_teacher_profile(
 ) -> bool:
     role = str(profile.get("role") or "").strip()
     if role and role != "teacher":
+        return False
+
+    profile_email = str(profile.get("email") or "").strip().lower()
+    if profile_email and profile_email != email:
+        return False
+
+    profile_school = str(profile.get("school_name") or "").strip()
+    if profile_school and profile_school != school_name:
+        return False
+
+    return True
+
+
+def _is_repairable_linked_teacher_profile(
+    profile: dict[str, Any],
+    *,
+    email: str,
+    school_name: str,
+    teacher_id: str,
+    linked_user_id: str,
+) -> bool:
+    if not teacher_id or not linked_user_id:
+        return False
+
+    profile_id = str(profile.get("id") or "")
+    if profile_id and profile_id != linked_user_id:
         return False
 
     profile_email = str(profile.get("email") or "").strip().lower()

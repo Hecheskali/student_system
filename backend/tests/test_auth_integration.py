@@ -3,37 +3,41 @@ Comprehensive API integration tests for authentication flows.
 Tests login, refresh, 2FA setup, password reset, and email verification.
 """
 
-import pytest
+import uuid
 from datetime import UTC, datetime, timedelta
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
-from app.db.session import get_db
-from app.models.user import User
-from app.models.auth_security import RefreshToken, UserSession
+from app.models.user import User, UserRole
+from app.models.auth_security import RefreshToken
 from app.core.security import hash_password
 from app.core.config import get_settings
 
+pytestmark = pytest.mark.anyio
+
+TEST_USER_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
+
 
 @pytest.fixture
-def client():
+def client(db: AsyncSession):
     """Create test client."""
-    return TestClient(app)
+    return TestClient(app, base_url="http://localhost")
 
 
 @pytest.fixture
 async def test_user(db: AsyncSession):
     """Create a test user."""
     user = User(
-        id="test-user-123",
+        id=TEST_USER_ID,
         email="test@example.com",
-        name="Test User",
+        full_name="Test User",
         password_hash=hash_password("TestPassword123!"),
-        role="teacher",
+        role=UserRole.teacher,
         is_active=True,
-        school_name="Test School",
-        district_name="Test District",
+        must_change_password=False,
     )
     db.add(user)
     await db.commit()
@@ -43,7 +47,7 @@ async def test_user(db: AsyncSession):
 class TestAuthLogin:
     """Test suite for authentication login flow."""
 
-    def test_login_success(self, client: TestClient, test_user):
+    async def test_login_success(self, client: TestClient, test_user):
         """Test successful login returns access token."""
         response = client.post(
             "/api/v1/auth/login",
@@ -59,7 +63,7 @@ class TestAuthLogin:
         assert data["token_type"] == "bearer"
         assert "expires_in" in data
 
-    def test_login_invalid_email(self, client: TestClient):
+    async def test_login_invalid_email(self, client: TestClient):
         """Test login with non-existent email."""
         response = client.post(
             "/api/v1/auth/login",
@@ -71,7 +75,7 @@ class TestAuthLogin:
         assert response.status_code == 401
         assert response.json()["detail"] == "Invalid email or password."
 
-    def test_login_invalid_password(self, client: TestClient, test_user):
+    async def test_login_invalid_password(self, client: TestClient, test_user):
         """Test login with wrong password."""
         response = client.post(
             "/api/v1/auth/login",
@@ -97,7 +101,7 @@ class TestAuthLogin:
             },
         )
         assert response.status_code == 403
-        assert "inactive" in response.json()["detail"].lower()
+        assert "disabled" in response.json()["detail"].lower()
 
     async def test_login_locked_account(self, client: TestClient, db: AsyncSession, test_user):
         """Test login with locked account."""
@@ -116,7 +120,7 @@ class TestAuthLogin:
         assert response.status_code == 423
         assert "locked" in response.json()["detail"].lower()
 
-    def test_login_rate_limiting(self, client: TestClient):
+    async def test_login_rate_limiting(self, client: TestClient):
         """Test rate limiting on login endpoint."""
         settings = get_settings()
 
@@ -173,7 +177,7 @@ class TestAuthLogin:
 class TestRefreshToken:
     """Test suite for refresh token flow."""
 
-    def test_refresh_token_generates_new_access(self, client: TestClient, test_user):
+    async def test_refresh_token_generates_new_access(self, client: TestClient, test_user):
         """Test refreshing token generates new access token."""
         # First, login to get initial tokens
         login_response = client.post(
@@ -199,11 +203,11 @@ class TestRefreshToken:
         # New access token should be different
         assert data["access_token"] != initial_access
 
-    def test_refresh_invalid_token(self, client: TestClient):
+    async def test_refresh_invalid_token(self, client: TestClient):
         """Test refresh with invalid token."""
         response = client.post(
             "/api/v1/auth/refresh",
-            json={"refresh_token": "invalid.token.here"},
+            json={"refresh_token": "invalid.token.here".ljust(32, "x")},
         )
 
         assert response.status_code == 401
@@ -213,7 +217,9 @@ class TestRefreshToken:
         """Test refresh with expired token."""
         # Create an expired refresh token
         expired_token = RefreshToken(
-            user_id="test-user-123",
+            user_id=TEST_USER_ID,
+            session_id=uuid.uuid4(),
+            jti="expired-test-token",
             token_hash="test-hash",
             expires_at=datetime.now(UTC) - timedelta(hours=1),
         )
@@ -222,12 +228,12 @@ class TestRefreshToken:
 
         response = client.post(
             "/api/v1/auth/refresh",
-            json={"refresh_token": "invalid.token.here"},
+            json={"refresh_token": "invalid.token.here".ljust(32, "x")},
         )
 
         assert response.status_code == 401
 
-    def test_refresh_rotates_token(self, client: TestClient, test_user):
+    async def test_refresh_rotates_token(self, client: TestClient, test_user):
         """Test that refresh token is rotated (token rotation security)."""
         login_response = client.post(
             "/api/v1/auth/login",
@@ -252,7 +258,7 @@ class TestRefreshToken:
 class TestTwoFactorAuth:
     """Test suite for 2FA setup and verification."""
 
-    def test_2fa_setup_returns_provisioning_uri(self, client: TestClient, test_user):
+    async def test_2fa_setup_returns_provisioning_uri(self, client: TestClient, test_user):
         """Test 2FA setup returns provisioning URI for QR code."""
         # Login first
         login_response = client.post(
@@ -276,12 +282,12 @@ class TestTwoFactorAuth:
         assert len(data["backup_codes"]) > 0
         assert "secret" in data
 
-    def test_2fa_setup_requires_auth(self, client: TestClient):
+    async def test_2fa_setup_requires_auth(self, client: TestClient):
         """Test 2FA setup requires authentication."""
         response = client.post("/api/v1/auth/2fa/setup")
         assert response.status_code == 401
 
-    def test_2fa_confirm_with_valid_code(self, client: TestClient, test_user):
+    async def test_2fa_confirm_with_valid_code(self, client: TestClient, test_user):
         """Test confirming 2FA with valid TOTP code."""
         import pyotp
 
@@ -309,15 +315,14 @@ class TestTwoFactorAuth:
             "/api/v1/auth/2fa/confirm",
             headers={"Authorization": f"Bearer {access_token}"},
             json={
-                "code": valid_code,
-                "secret": secret,
+                "otp_code": valid_code,
             },
         )
 
         assert response.status_code == 200
-        assert response.json()["message"] == "2FA enabled successfully"
+        assert response.json()["detail"] == "Two-factor authentication enabled."
 
-    def test_2fa_confirm_with_invalid_code(self, client: TestClient, test_user):
+    async def test_2fa_confirm_with_invalid_code(self, client: TestClient, test_user):
         """Test confirming 2FA with invalid code."""
         login_response = client.post(
             "/api/v1/auth/login",
@@ -338,16 +343,17 @@ class TestTwoFactorAuth:
             "/api/v1/auth/2fa/confirm",
             headers={"Authorization": f"Bearer {access_token}"},
             json={
-                "code": "000000",
-                "secret": secret,
+                "otp_code": "000000",
             },
         )
 
         assert response.status_code == 400
         assert "invalid" in response.json()["detail"].lower()
 
-    def test_2fa_disable_requires_password(self, client: TestClient, test_user):
+    async def test_2fa_disable_requires_password(self, client: TestClient, test_user):
         """Test disabling 2FA requires password confirmation."""
+        import pyotp
+
         login_response = client.post(
             "/api/v1/auth/login",
             json={
@@ -357,34 +363,47 @@ class TestTwoFactorAuth:
         )
         access_token = login_response.json()["access_token"]
 
+        setup_response = client.post(
+            "/api/v1/auth/2fa/setup",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        secret = setup_response.json()["secret"]
+        client.post(
+            "/api/v1/auth/2fa/confirm",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"otp_code": pyotp.TOTP(secret).now()},
+        )
+
         response = client.post(
             "/api/v1/auth/2fa/disable",
             headers={"Authorization": f"Bearer {access_token}"},
             json={"password": "WrongPassword123!"},
         )
 
-        assert response.status_code == 401
-        assert "invalid password" in response.json()["detail"].lower()
+        assert response.status_code == 400
+        assert "password" in response.json()["detail"].lower()
 
 
 class TestPasswordReset:
     """Test suite for password reset flow."""
 
-    def test_password_reset_request_sends_token(self, client: TestClient, test_user):
+    async def test_password_reset_request_sends_token(self, client: TestClient, test_user):
         """Test password reset request generates and sends token."""
         response = client.post(
-            "/api/v1/auth/password-reset",
+            "/api/v1/auth/password-reset/request",
             json={"email": "test@example.com"},
         )
 
         assert response.status_code == 200
         # Don't expose whether email exists
-        assert response.json()["message"] == "If email exists, reset link has been sent"
+        assert response.json()["detail"] == (
+            "If the email exists, a password reset token has been issued."
+        )
 
-    def test_password_reset_with_invalid_email(self, client: TestClient):
+    async def test_password_reset_with_invalid_email(self, client: TestClient):
         """Test password reset with non-existent email."""
         response = client.post(
-            "/api/v1/auth/password-reset",
+            "/api/v1/auth/password-reset/request",
             json={"email": "nonexistent@example.com"},
         )
 
@@ -393,7 +412,7 @@ class TestPasswordReset:
 
     async def test_password_reset_confirm_with_valid_token(self, client: TestClient, test_user, db: AsyncSession):
         """Test confirming password reset with valid token."""
-        from app.services.auth_lifecycle import create_security_token, consume_security_token
+        from app.services.auth_lifecycle import create_security_token
         from datetime import UTC, timedelta
 
         # Create reset token
@@ -405,9 +424,9 @@ class TestPasswordReset:
             expires_at=expires_at,
         )
 
-        new_password = "NewPassword123!"
+        new_password = "BetterReset9$"
         response = client.post(
-            "/api/v1/auth/password-reset-confirm",
+            "/api/v1/auth/password-reset/confirm",
             json={
                 "token": token,
                 "new_password": new_password,
@@ -416,13 +435,13 @@ class TestPasswordReset:
 
         assert response.status_code == 200
 
-    def test_password_reset_confirm_with_invalid_token(self, client: TestClient):
+    async def test_password_reset_confirm_with_invalid_token(self, client: TestClient):
         """Test confirming password reset with invalid token."""
         response = client.post(
-            "/api/v1/auth/password-reset-confirm",
+            "/api/v1/auth/password-reset/confirm",
             json={
                 "token": "invalid.token.here",
-                "new_password": "NewPassword123!",
+                "new_password": "BetterReset9$",
             },
         )
 
@@ -443,10 +462,10 @@ class TestPasswordReset:
         )
 
         response = client.post(
-            "/api/v1/auth/password-reset-confirm",
+            "/api/v1/auth/password-reset/confirm",
             json={
                 "token": token,
-                "new_password": "weak",
+                "new_password": "Aaaa1111!!!!",
             },
         )
 
@@ -457,7 +476,7 @@ class TestPasswordReset:
 class TestLogout:
     """Test suite for logout flow."""
 
-    def test_logout_revokes_session(self, client: TestClient, test_user):
+    async def test_logout_revokes_session(self, client: TestClient, test_user):
         """Test logout revokes current session."""
         login_response = client.post(
             "/api/v1/auth/login",
@@ -482,7 +501,7 @@ class TestLogout:
         )
         assert protected_response.status_code == 401
 
-    def test_logout_all_sessions(self, client: TestClient, test_user):
+    async def test_logout_all_sessions(self, client: TestClient, test_user):
         """Test logout from all sessions."""
         # Create multiple sessions
         login1 = client.post(

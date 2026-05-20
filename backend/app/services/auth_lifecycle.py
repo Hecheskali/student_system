@@ -14,6 +14,7 @@ from app.core.security import (
     generate_opaque_token,
     hash_opaque_token,
 )
+from app.core.time import is_before_now
 from app.models.auth_security import RefreshToken, SecurityToken, UserSession
 from app.models.user import User
 
@@ -197,7 +198,7 @@ async def consume_security_token(
     )
     if token is None or token.consumed_at is not None:
         return None
-    if token.expires_at < datetime.now(UTC):
+    if is_before_now(token.expires_at):
         return None
     token.consumed_at = datetime.now(UTC)
     await db.commit()

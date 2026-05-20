@@ -268,8 +268,23 @@ def test_create_teacher_account_links_legacy_teacher_row():
     assert service.client.auth.admin.updated_payloads[0][0] == TEACHER_USER_ID
 
 
-def test_create_teacher_account_rejects_already_linked_teacher_row():
+def test_create_teacher_account_repairs_already_linked_teacher_row():
+    auth_user = SimpleNamespace(
+        id=TEACHER_USER_ID,
+        email="legacy.teacher@example.com",
+    )
     service = StubSupabaseAdminService(
+        auth_users=[auth_user],
+        users=[
+            {
+                "id": TEACHER_USER_ID,
+                "email": "legacy.teacher@example.com",
+                "role": "head_of_school",
+                "school_name": "Summit View College",
+                "district_name": "Jabu District",
+                "profile": {},
+            },
+        ],
         teachers=[
             {
                 "id": TEACHER_ID,
@@ -283,10 +298,16 @@ def test_create_teacher_account_rejects_already_linked_teacher_row():
         ],
     )
 
-    with pytest.raises(HTTPException) as exc_info:
-        service.create_teacher_account(_payload(), _principal())
+    teacher = service.create_teacher_account(_payload(), _principal())
 
-    assert exc_info.value.status_code == 409
+    assert str(teacher.id) == TEACHER_ID
+    assert str(teacher.user_id) == TEACHER_USER_ID
+    assert service.tables["teachers"][0]["user_id"] == TEACHER_USER_ID
+    assert service.tables["teachers"][0]["subject"] == "Basic Mathematics"
+    assert service.tables["users"][0]["role"] == "teacher"
+    assert service.tables["users"][0]["profile"]["teacher_id"] == TEACHER_ID
+    assert not service.client.auth.admin.created_payloads
+    assert service.client.auth.admin.updated_payloads[0][0] == TEACHER_USER_ID
 
 
 def test_create_teacher_account_does_not_hijack_non_teacher_auth_profile():

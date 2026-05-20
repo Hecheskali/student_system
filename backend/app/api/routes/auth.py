@@ -13,6 +13,7 @@ from app.core.refresh_tokens import refresh_token_manager
 from app.core.two_factor_auth import backup_codes_manager, totp_manager
 from app.core.security import hash_password, hash_opaque_token
 from app.core.rate_limit import RateLimit
+from app.core.time import is_before_now
 from app.db.session import get_db
 from app.models.auth_security import RefreshToken, SecurityToken, UserSession
 from app.models.user import User
@@ -236,7 +237,7 @@ async def refresh_access_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token reuse detected. All sessions revoked.",
         )
-    if token_record.expires_at < datetime.now(UTC):
+    if is_before_now(token_record.expires_at):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token expired.",

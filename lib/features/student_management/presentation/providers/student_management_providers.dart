@@ -182,7 +182,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
 
   bool get hasLiveBackend => _store != null;
 
-  Future<void> _hydrateFromSupabase() async {
+  Future<void> _hydrateFromSupabase({UserRole? expectedRole}) async {
     if (_store == null) {
       return;
     }
@@ -191,6 +191,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
     try {
       final SupabaseSchoolAdminLoadResult loaded = await store.load(
         fallbackState: state,
+        expectedRole: expectedRole,
       );
       state = state.copyWith(
         session: loaded.session,
@@ -227,6 +228,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
       password: password,
       fallbackSchoolName: state.schoolName,
       fallbackDistrictName: state.districtName,
+      expectedRole: expectedRole,
     );
 
     // Immediately update state with the session from sign in
@@ -234,7 +236,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
       state = state.copyWith(session: session);
     }
 
-    await _hydrateFromSupabase();
+    await _hydrateFromSupabase(expectedRole: expectedRole);
 
     final SessionUser? signedInSession = state.session ?? session;
     if (signedInSession == null) {
@@ -386,12 +388,13 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
         canRegisterStudents: state.settings.allowTeacherStudentRegistration,
         canDownloadResults: state.settings.allowTeacherResultDownloads,
       );
-      final TeacherAccount backendTeacher = await _createTeacherAccountWithRetry(
-        store: store,
-        teacherAccountService: teacherAccountService,
-        teacher: teacherDraft,
-        password: initialPassword,
-      );
+      final TeacherAccount backendTeacher =
+          await _createTeacherAccountWithRetry(
+            store: store,
+            teacherAccountService: teacherAccountService,
+            teacher: teacherDraft,
+            password: initialPassword,
+          );
       final TeacherAccount savedTeacher = await store.saveTeacher(
         teacher: backendTeacher,
         schoolName: state.schoolName,

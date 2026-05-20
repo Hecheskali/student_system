@@ -79,6 +79,7 @@ class SupabaseSchoolAdminStore {
 
   Future<SupabaseSchoolAdminLoadResult> load({
     required SchoolAdminState fallbackState,
+    UserRole? expectedRole,
   }) async {
     final ({
       String schoolName,
@@ -101,6 +102,7 @@ class SupabaseSchoolAdminStore {
       schoolName: config.schoolName,
       districtName: config.districtName,
       teachers: teachers,
+      expectedRole: expectedRole,
     );
 
     return SupabaseSchoolAdminLoadResult(
@@ -120,12 +122,14 @@ class SupabaseSchoolAdminStore {
     required String password,
     required String fallbackSchoolName,
     required String fallbackDistrictName,
+    UserRole? expectedRole,
   }) async {
     await _service.signInWithEmailAndPassword(email, password);
     return _buildSessionFromCurrentAuth(
       schoolName: fallbackSchoolName,
       districtName: fallbackDistrictName,
       teachers: await loadTeachers(),
+      expectedRole: expectedRole,
     );
   }
 
@@ -477,6 +481,7 @@ class SupabaseSchoolAdminStore {
     required String schoolName,
     required String districtName,
     required List<TeacherAccount> teachers,
+    UserRole? expectedRole,
   }) async {
     final User? user = _service.currentUser;
     if (user == null) {
@@ -502,7 +507,10 @@ class SupabaseSchoolAdminStore {
       fallback: districtName,
     );
 
-    if (role == UserRole.teacher) {
+    final bool shouldResolveTeacher =
+        role == UserRole.teacher || expectedRole == UserRole.teacher;
+
+    if (shouldResolveTeacher) {
       final Map<String, dynamic> userProfile = _mapValue(profile['profile']);
       final String teacherId = _stringValue(userProfile, 'teacher_id');
 
@@ -522,7 +530,7 @@ class SupabaseSchoolAdminStore {
           id: teacher.id,
           name: teacher.name,
           email: teacher.email,
-          role: role,
+          role: UserRole.teacher,
           schoolName: resolvedSchoolName,
           districtName: resolvedDistrictName,
           subject: teacher.subject,
@@ -1109,10 +1117,18 @@ double _gpaFromAverage(double average) {
 }
 
 UserRole _roleFromDatabase(String value) {
-  switch (value) {
+  final String normalized = value
+      .trim()
+      .replaceAll('-', '_')
+      .replaceAll(' ', '_')
+      .toLowerCase();
+  switch (normalized) {
     case 'academic_master':
+    case 'academicmaster':
       return UserRole.academicMaster;
     case 'head_of_school':
+    case 'headofschool':
+    case 'headmaster':
       return UserRole.headOfSchool;
     default:
       return UserRole.teacher;
