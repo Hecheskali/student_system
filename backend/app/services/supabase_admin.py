@@ -170,33 +170,49 @@ class SupabaseAdminService:
                 subjects=subjects,
                 assigned_classes=assigned_classes,
             )
-            auth_user = self._find_auth_user_by_email(email)
             auth_user_was_created = False
-            if auth_user is not None and existing_teacher_user_id:
-                auth_user_id = str(_get_attr(auth_user, "id", ""))
-                if auth_user_id and auth_user_id != existing_teacher_user_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="This email belongs to another Supabase auth user.",
-                    )
 
             if existing_teacher_user_id:
                 user_id = existing_teacher_user_id
-            elif auth_user is None:
-                auth_response = self.client.auth.admin.create_user(
-                    {
-                        "email": email,
-                        "password": payload.password,
-                        "email_confirm": True,
-                        "user_metadata": metadata,
-                        "app_metadata": {"role": "teacher"},
-                    },
-                )
-                auth_user = _response_user(auth_response)
-                auth_user_was_created = True
-                user_id = str(_get_attr(auth_user, "id", ""))
             else:
-                user_id = str(_get_attr(auth_user, "id", ""))
+                try:
+                    auth_response = self.client.auth.admin.create_user(
+                        {
+                            "email": email,
+                            "password": payload.password,
+                            "email_confirm": True,
+                            "user_metadata": metadata,
+                            "app_metadata": {"role": "teacher"},
+                        },
+                    )
+                    auth_user = _response_user(auth_response)
+                    auth_user_was_created = True
+                    user_id = str(_get_attr(auth_user, "id", ""))
+                except Exception as exc:
+                    error_msg = str(exc).lower()
+                    if "already exists" in error_msg or "user exists" in error_msg:
+                        existing_auth_user = self._fetch_single(
+                            "users",
+                            filters={"email": email},
+                            select="id",
+                        )
+                        if existing_auth_user:
+                            user_id = str(existing_auth_user.get("id") or "")
+                            if not user_id:
+                                raise HTTPException(
+                                    status_code=status.HTTP_409_CONFLICT,
+                                    detail="This email belongs to another user.",
+                                ) from exc
+                        else:
+                            raise HTTPException(
+                                status_code=status.HTTP_409_CONFLICT,
+                                detail="This email is already registered.",
+                            ) from exc
+                    else:
+                        raise HTTPException(
+                            status_code=status.HTTP_502_BAD_GATEWAY,
+                            detail=f"Could not create Supabase auth user: {exc}",
+                        ) from exc
             if not user_id:
                 raise RuntimeError("Supabase did not return the created user id.")
             if auth_user_was_created:
@@ -541,36 +557,6 @@ class SupabaseAdminService:
             self.client.auth.admin.delete_user(user_id)
         except Exception:
             pass
-
-    def _find_auth_user_by_email(self, email: str) -> Any | None:
-        normalized_email = email.strip().lower()
-        if not normalized_email:
-            return None
-
-        for page in range(1, 11):
-            try:
-                response = self.client.auth.admin.list_users(
-                    page=page,
-                    per_page=1000,
-                )
-            except TypeError:
-                if page > 1:
-                    return None
-                response = self.client.auth.admin.list_users()
-            except Exception:
-                return None
-
-            users = _response_users(response)
-            if not users:
-                return None
-            for user in users:
-                user_email = str(_get_attr(user, "email", "") or "").strip().lower()
-                if user_email == normalized_email:
-                    return user
-            if len(users) < 1000:
-                return None
-
-        return None
 
     def _get_auth_user_from_access_token(self, access_token: str) -> dict[str, Any]:
         if (
