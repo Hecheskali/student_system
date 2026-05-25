@@ -111,6 +111,10 @@ async def require_supabase_headmaster(
         supabase_admin_service.get_principal_from_access_token,
         credentials.credentials,
     )
+    # Debugging output to verify the role value nimeweka mm hii kucheck kama #itafanya kazi vizuri
+    print("TOKEN ROLE:", principal.role)
+    print("EXPECTED:", UserRole.head_of_school.value)
+
     if principal.role != UserRole.head_of_school.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
