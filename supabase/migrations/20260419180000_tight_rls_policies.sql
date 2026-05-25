@@ -270,6 +270,12 @@ using (
   and name = public.get_user_district()
 );
 
+create policy "authenticated_read_all_districts"
+on public.districts
+for select
+to authenticated
+using (true);
+
 create policy "district_admin_manage_districts"
 on public.districts
 for all
@@ -318,6 +324,12 @@ using (
   public.is_teacher()
   and name = public.get_user_school()
 );
+
+create policy "authenticated_read_all_schools"
+on public.schools
+for select
+to authenticated
+using (true);
 
 create policy "district_admin_manage_schools"
 on public.schools
@@ -386,6 +398,12 @@ using (
   public.is_teacher()
   and public.user_assigned_to_class(id)
 );
+
+create policy "authenticated_read_all_classes"
+on public.classes
+for select
+to authenticated
+using (true);
 
 create policy "head_of_school_manage_classes"
 on public.classes
