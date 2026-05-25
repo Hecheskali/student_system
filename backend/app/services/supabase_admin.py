@@ -191,19 +191,34 @@ class SupabaseAdminService:
                 except Exception as exc:
                     error_msg = str(exc).lower()
                     if "already exists" in error_msg or "user exists" in error_msg:
-                        existing_auth_user = self._fetch_single(
-                            "users",
-                            filters={"email": email},
-                            select="id",
-                        )
-                        if existing_auth_user:
-                            user_id = str(existing_auth_user.get("id") or "")
-                            if not user_id:
-                                raise HTTPException(
-                                    status_code=status.HTTP_409_CONFLICT,
-                                    detail="This email belongs to another user.",
-                                ) from exc
-                        else:
+                        # User already exists in auth system, try to get their ID
+                        try:
+                            # First try to fetch from database users table
+                            existing_auth_user = self._fetch_single(
+                                "users",
+                                filters={"email": email},
+                                select="id",
+                            )
+                            if existing_auth_user:
+                                user_id = str(existing_auth_user.get("id") or "")
+                        except Exception:
+                            user_id = ""
+                        
+                        # If not found in database, search Supabase auth directly
+                        if not user_id:
+                            try:
+                                # List users and find by email - this is the user's existing auth account
+                                response = self.client.auth.admin.list_users(per_page=1000)
+                                users = _response_users(response)
+                                for user in users:
+                                    user_email = str(_get_attr(user, "email", "") or "").strip().lower()
+                                    if user_email == email.strip().lower():
+                                        user_id = str(_get_attr(user, "id", ""))
+                                        break
+                            except Exception:
+                                pass
+                        
+                        if not user_id:
                             raise HTTPException(
                                 status_code=status.HTTP_409_CONFLICT,
                                 detail="This email is already registered.",
