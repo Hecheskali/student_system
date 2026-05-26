@@ -14,7 +14,6 @@ from app.schemas.teachers import (
 
 from app.services.audit import write_audit_log
 from app.services.governance import anonymize_user, export_user_governance_snapshot
-from app.services.supabase_admin import SupabasePrincipal
 from app.schemas.hydration import (
     DistrictHydrationRequest,
     SchoolHydrationRequest,
