@@ -57,7 +57,7 @@ creates the first head-of-school admin on startup if it does not already exist.
 - `POST /api/v1/auth/logout`
 - `POST /api/v1/admin/users`
 - `GET /api/v1/admin/users`
-- `POST /api/v1/admin/teachers`
+- `pi/v1/admin/teachers`
 - `PATCH /api/v1/admin/teachers/{teacher_id}`
 - `GET /api/v1/admin/audit-logs`
 

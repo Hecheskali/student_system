@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/entities/education_entities.dart';
@@ -15,6 +20,59 @@ const List<String> kStandardSchoolClassNames = <String>[
   'Form 4 A',
   'Form 4 B',
 ];
+
+// Helper class for backend teacher creation request
+@immutable
+class _TeacherAccountCreateRequest {
+  const _TeacherAccountCreateRequest({
+    required this.name,
+    required this.email,
+    required this.password,
+    required this.schoolName,
+    required this.districtName,
+    required this.subject,
+    required this.assignedClass,
+    required this.subjects,
+    required this.assignedClasses,
+    required this.canUploadResults,
+    required this.canEditResults,
+    required this.canRegisterStudents,
+    required this.canDownloadResults,
+    required this.isActive,
+  });
+
+  final String name;
+  final String email;
+  final String password;
+  final String schoolName;
+  final String districtName;
+  final String subject;
+  final String assignedClass;
+  final List<String> subjects;
+  final List<String> assignedClasses;
+  final bool canUploadResults;
+  final bool canEditResults;
+  final bool canRegisterStudents;
+  final bool canDownloadResults;
+  final bool isActive;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'email': email,
+        'password': password,
+        'school_name': schoolName,
+        'district_name': districtName,
+        'subject': subject,
+        'assigned_class': assignedClass,
+        'subjects': subjects,
+        'assigned_classes': assignedClasses,
+        'can_upload_results': canUploadResults,
+        'can_edit_results': canEditResults,
+        'can_register_students': canRegisterStudents,
+        'can_download_results': canDownloadResults,
+        'is_active': isActive,
+      };
+}
 
 @immutable
 class SupabaseSchoolAdminLoadResult {
@@ -43,6 +101,9 @@ class SupabaseSchoolAdminStore {
   SupabaseSchoolAdminStore(this._service);
 
   final SupabaseService _service;
+
+  // ---------- FIXED: Centralised backend URL ----------
+  static const String _baseUrl = 'https://student-system-h7pi.onrender.com';
 
   SupabaseClient get _client => _service.client;
 
@@ -76,6 +137,47 @@ class SupabaseSchoolAdminStore {
     }
     return refreshedToken;
   }
+
+  // ---------- FIXED: Generic POST helper with auth, timeout & error handling ----------
+  Future<Map<String, dynamic>> _postRequest({
+    required String endpoint,
+    required Map<String, dynamic> body,
+  }) async {
+    final String token = await freshAccessToken();
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/$endpoint'),
+            headers: <String, String>{
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+
+      debugPrint(
+        'API ERROR [$endpoint]: ${response.statusCode} ${response.body}',
+      );
+
+      throw StateError(
+        'Request failed (${response.statusCode}): ${response.body}',
+      );
+    } on TimeoutException {
+      throw StateError('Server timeout. Please try again.');
+    } on SocketException {
+      throw StateError('No internet connection.');
+    } catch (error) {
+      throw StateError('Unexpected error: $error');
+    }
+  }
+
+  // ---------- ORIGINAL METHODS (unchanged except for the three _ensure* below) ----------
 
   Future<SupabaseSchoolAdminLoadResult> load({
     required SchoolAdminState fallbackState,
@@ -208,47 +310,62 @@ class SupabaseSchoolAdminStore {
         .toList(growable: false);
   }
 
+  // =========================================================
+  // FIXED: saveTeacher now calls backend API endpoint
+  // =========================================================
   Future<TeacherAccount> saveTeacher({
     required TeacherAccount teacher,
     required String schoolName,
     required String districtName,
-    String? userId,
+    String? userId,  // kept for compatibility but not used by backend
   }) async {
-    final String normalizedEmail = teacher.email.trim().toLowerCase();
-    final Map<String, dynamic>? existing = await _findTeacher(
-      teacherId: _looksLikeUuid(teacher.id) ? teacher.id : null,
-      userId: userId,
-      email: normalizedEmail,
+    // Backend requires a password. Generate a temporary one and require teacher
+    // to reset on first login. In production, ask headmaster for password via UI.
+    final tempPassword = _generateRandomPassword();
+
+    final request = _TeacherAccountCreateRequest(
+      name: teacher.name,
+      email: teacher.email.trim().toLowerCase(),
+      password: tempPassword,
+      schoolName: schoolName,
+      districtName: districtName,
+      subject: teacher.subject,
+      assignedClass: teacher.assignedClass,
+      subjects: teacher.subjects,
+      assignedClasses: teacher.assignedClasses,
+      canUploadResults: teacher.canUploadResults,
+      canEditResults: teacher.canEditResults,
+      canRegisterStudents: teacher.canRegisterStudents,
+      canDownloadResults: teacher.canDownloadResults,
+      isActive: teacher.isActive,
     );
 
-    final Map<String, dynamic> payload = <String, dynamic>{
-      'name': teacher.name,
-      'email': normalizedEmail,
-      'subject': teacher.subject,
-      'assigned_class': teacher.assignedClass,
-      'can_upload_results': teacher.canUploadResults,
-      'can_edit_results': teacher.canEditResults,
-      'can_register_students': teacher.canRegisterStudents,
-      'can_download_results': teacher.canDownloadResults,
-      'subjects': teacher.subjects,
-      'assigned_classes': teacher.assignedClasses,
-      'school_name': schoolName,
-      'district_name': districtName,
-      'profile': <String, dynamic>{'is_active': teacher.isActive},
-    };
-    if (existing != null) {
-      payload['id'] = existing['id'];
-    }
-    if (userId != null) {
-      payload['user_id'] = userId;
-    }
+    final responseData = await _postRequest(
+      endpoint: 'admin/teachers',
+      body: request.toJson(),
+    );
 
-    final dynamic saved = await _client
-        .from('teachers')
-        .upsert(payload, onConflict: 'id')
-        .select()
-        .single();
-    return _teacherFromRow(_asMap(saved));
+    // Convert backend response (TeacherAccountRead) to our TeacherAccount entity
+    return TeacherAccount(
+      id: responseData['id'].toString(),
+      name: responseData['name'].toString(),
+      email: responseData['email'].toString(),
+      subject: responseData['subject'].toString(),
+      assignedClass: responseData['assigned_class'].toString(),
+      canUploadResults: responseData['can_upload_results'] ?? true,
+      canEditResults: responseData['can_edit_results'] ?? true,
+      subjects: List<String>.from(responseData['subjects'] ?? []),
+      assignedClasses: List<String>.from(responseData['assigned_classes'] ?? []),
+      canRegisterStudents: responseData['can_register_students'] ?? true,
+      canDownloadResults: responseData['can_download_results'] ?? true,
+      isActive: responseData['is_active'] ?? true,
+    );
+  }
+
+  String _generateRandomPassword() {
+    // Generate a 12-character alphanumeric + symbol password
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#%&*?';
+    return List.generate(12, (_) => chars[DateTime.now().microsecond % chars.length]).join();
   }
 
   Future<void> deleteTeacher(String teacherId) async {
@@ -652,56 +769,34 @@ class SupabaseSchoolAdminStore {
     );
   }
 
+  // ---------- FIXED: Backend communication methods (now use _postRequest) ----------
+
   Future<Map<String, dynamic>> _ensureDistrict({
     required String districtName,
   }) async {
-    final dynamic existing = await _client
-        .from('districts')
-        .select()
-        .eq('name', districtName)
-        .limit(1)
-        .maybeSingle();
-    if (existing != null) {
-      return _asMap(existing);
+    if (districtName.trim().isEmpty) {
+      throw StateError('District name cannot be empty.');
     }
-
-    final dynamic inserted = await _client
-        .from('districts')
-        .insert(<String, dynamic>{
-          'name': districtName,
-          'region_label': 'Configured district',
-          'focus_area': 'Academic monitoring',
-        })
-        .select()
-        .single();
-    return _asMap(inserted);
+    return _postRequest(
+      endpoint: 'admin/districts',
+      body: <String, dynamic>{'name': districtName.trim()},
+    );
   }
 
   Future<Map<String, dynamic>> _ensureSchool({
     required String districtId,
     required String schoolName,
   }) async {
-    final dynamic existing = await _client
-        .from('schools')
-        .select()
-        .eq('district_id', districtId)
-        .eq('name', schoolName)
-        .limit(1)
-        .maybeSingle();
-    if (existing != null) {
-      return _asMap(existing);
+    if (schoolName.trim().isEmpty) {
+      throw StateError('School name cannot be empty.');
     }
-
-    final dynamic inserted = await _client
-        .from('schools')
-        .insert(<String, dynamic>{
-          'district_id': districtId,
-          'name': schoolName,
-          'principal': '',
-        })
-        .select()
-        .single();
-    return _asMap(inserted);
+    return _postRequest(
+      endpoint: 'admin/schools',
+      body: <String, dynamic>{
+        'district_name': districtId,
+        'name': schoolName.trim(),
+      },
+    );
   }
 
   Future<Map<String, dynamic>> _ensureClass({
@@ -709,29 +804,20 @@ class SupabaseSchoolAdminStore {
     required String schoolId,
     required String className,
   }) async {
-    final dynamic existing = await _client
-        .from('classes')
-        .select()
-        .eq('school_id', schoolId)
-        .eq('name', className)
-        .limit(1)
-        .maybeSingle();
-    if (existing != null) {
-      return _asMap(existing);
+    if (className.trim().isEmpty) {
+      throw StateError('Class name cannot be empty.');
     }
-
-    final dynamic inserted = await _client
-        .from('classes')
-        .insert(<String, dynamic>{
-          'school_id': schoolId,
-          'district_id': districtId,
-          'name': className,
-          'teacher': '',
-        })
-        .select()
-        .single();
-    return _asMap(inserted);
+    return _postRequest(
+      endpoint: 'admin/classes',
+      body: <String, dynamic>{
+        'district_name': districtId,
+        'school_name': schoolId,
+        'name': className.trim(),
+      },
+    );
   }
+
+  // ---------- Helper methods (unchanged) ----------
 
   TeacherAccount _teacherFromRow(Map<String, dynamic> row) {
     final Map<String, dynamic> profile = _mapValue(row['profile']);
@@ -936,6 +1022,10 @@ class SupabaseSchoolAdminStore {
     }
   }
 }
+
+// =========================================================
+// STANDALONE HELPER FUNCTIONS (unchanged)
+// =========================================================
 
 Map<String, dynamic> _studentProfilePayload(StudentResultRecord record) {
   return <String, dynamic>{

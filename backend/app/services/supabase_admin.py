@@ -12,6 +12,17 @@ from app.schemas.teachers import (
     TeacherAccountUpdate,
 )
 
+from app.services.audit import write_audit_log
+from app.services.governance import anonymize_user, export_user_governance_snapshot
+from app.services.supabase_admin import SupabasePrincipal
+from app.schemas.hydration import (
+    DistrictHydrationRequest,
+    SchoolHydrationRequest,
+    ClassHydrationRequest,
+    HydrationResponse,
+)
+
+
 
 @dataclass(frozen=True)
 class SupabasePrincipal:
@@ -470,6 +481,28 @@ class SupabaseAdminService:
 
         return _teacher_read_from_row(teacher_row)
 
+    def delete_teacher_account(
+        self,
+        teacher_id: uuid.UUID,
+        principal: SupabasePrincipal,
+    ) -> None:
+        _ensure_headmaster(principal)
+        teacher = self._fetch_single("teachers", filters={"id": str(teacher_id)})
+        if teacher is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Teacher profile not found.",
+            )
+        _ensure_same_school(principal, str(teacher.get("school_name") or ""))
+
+        user_id = str(teacher.get("user_id") or "")
+        self._delete("teachers", filters={"id": str(teacher_id)})
+        if user_id:
+            try:
+                self.client.auth.admin.delete_user(user_id)
+            except Exception:
+                pass
+
     def _ensure_reference_data(
         self,
         *,
@@ -566,6 +599,17 @@ class SupabaseAdminService:
         if not rows:
             raise RuntimeError(f"Supabase update on {table} returned no row.")
         return dict(rows[0])
+
+    def _delete(
+        self,
+        table: str,
+        *,
+        filters: dict[str, Any],
+    ) -> None:
+        query = self.client.table(table).delete()
+        for column, value in filters.items():
+            query = query.eq(column, value)
+        query.execute()
 
     def _delete_auth_user_safely(self, user_id: str) -> None:
         try:

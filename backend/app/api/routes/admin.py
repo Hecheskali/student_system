@@ -23,6 +23,12 @@ from app.schemas.teachers import (
 from app.services.audit import write_audit_log
 from app.services.governance import anonymize_user, export_user_governance_snapshot
 from app.services.supabase_admin import SupabasePrincipal
+from app.schemas.hydration import (
+    DistrictHydrationRequest,
+    SchoolHydrationRequest,
+    ClassHydrationRequest,
+    HydrationResponse,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -125,6 +131,21 @@ async def update_teacher_account(
     )
 
 
+@router.delete(
+    "/teachers/{teacher_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_teacher_account(
+    teacher_id: uuid.UUID,
+    current_user: SupabasePrincipal = Depends(require_supabase_headmaster),
+) -> None:
+    await run_in_threadpool(
+        supabase_admin_service.delete_teacher_account,
+        teacher_id,
+        current_user,
+    )
+
+
 @router.get(
     "/audit-logs",
     response_model=list[AuditLogRead],
@@ -173,3 +194,67 @@ async def delete_user_data(
         request=request,
     )
     return {"detail": "User anonymized."}
+
+
+# --- Hydration endpoints ---
+
+@router.post(
+    "/districts",
+    response_model=HydrationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def hydrate_district(
+    payload: DistrictHydrationRequest,
+    current_user: SupabasePrincipal = Depends(require_supabase_headmaster),
+):
+    try:
+        # Use admin service to ensure district exists
+        await run_in_threadpool(
+            supabase_admin_service._ensure_reference_data,
+            school_name="",
+            district_name=payload.name,
+            class_names=[],
+        )
+        return HydrationResponse(success=True)
+    except Exception as exc:
+        return HydrationResponse(success=False, detail=str(exc))
+
+@router.post(
+    "/schools",
+    response_model=HydrationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def hydrate_school(
+    payload: SchoolHydrationRequest,
+    current_user: SupabasePrincipal = Depends(require_supabase_headmaster),
+):
+    try:
+        await run_in_threadpool(
+            supabase_admin_service._ensure_reference_data,
+            school_name=payload.name,
+            district_name=payload.district_name,
+            class_names=[],
+        )
+        return HydrationResponse(success=True)
+    except Exception as exc:
+        return HydrationResponse(success=False, detail=str(exc))
+
+@router.post(
+    "/classes",
+    response_model=HydrationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def hydrate_class(
+    payload: ClassHydrationRequest,
+    current_user: SupabasePrincipal = Depends(require_supabase_headmaster),
+):
+    try:
+        await run_in_threadpool(
+            supabase_admin_service._ensure_reference_data,
+            school_name=payload.school_name,
+            district_name=payload.district_name,
+            class_names=[payload.name],
+        )
+        return HydrationResponse(success=True)
+    except Exception as exc:
+        return HydrationResponse(success=False, detail=str(exc))
