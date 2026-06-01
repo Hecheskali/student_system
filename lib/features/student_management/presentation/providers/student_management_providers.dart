@@ -172,9 +172,7 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
   }) : _store = store,
        _teacherAccountService = teacherAccountService,
        super(_initialAdminState()) {
-    if (_store != null) {
-      _hydrateFromSupabase();
-    }
+    // Don't hydrate on init - wait for user login first
   }
 
   final SupabaseSchoolAdminStore? _store;
@@ -395,16 +393,11 @@ class SchoolAdminController extends StateNotifier<SchoolAdminState> {
             teacher: teacherDraft,
             password: initialPassword,
           );
-      final TeacherAccount savedTeacher = await store.saveTeacher(
-        teacher: backendTeacher,
-        schoolName: state.schoolName,
-        districtName: state.districtName,
-      );
       state = state.copyWith(
         teachers: <TeacherAccount>[
           for (final TeacherAccount current in state.teachers)
-            if (!_sameTeacherIdentity(current, savedTeacher)) current,
-          savedTeacher,
+            if (!_sameTeacherIdentity(current, backendTeacher)) current,
+          backendTeacher,
         ],
       );
     } on StateError catch (error) {

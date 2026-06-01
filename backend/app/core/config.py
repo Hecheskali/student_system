@@ -91,7 +91,7 @@ class Settings(BaseSettings):
         alias="ALLOWED_ORIGINS",
     )
     allowed_origin_regex: str | None = Field(
-        default=r"https://student-[a-z0-9-]+\.vercel\.app",
+        default=r"(http://localhost:\d+|https://student-[a-z0-9-]+\.vercel\.app)",
         alias="ALLOWED_ORIGIN_REGEX",
     )
     enable_https_redirect: bool = Field(

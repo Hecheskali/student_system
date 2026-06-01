@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:student_system/core/theme/theme_mode_provider.dart';
+import 'package:student_system/features/student_management/data/services/backend_teacher_account_service.dart';
+import 'package:student_system/features/student_management/data/services/supabase_school_admin_store.dart';
 import 'package:student_system/features/student_management/domain/entities/education_entities.dart';
 import 'package:student_system/features/student_management/presentation/providers/headmaster_panel_provider.dart';
 import 'package:student_system/features/student_management/presentation/providers/student_management_providers.dart';
@@ -66,6 +68,40 @@ void main() {
     );
   });
 
+  test('headmaster teacher creation uses backend response once', () async {
+    final _FakeSupabaseSchoolAdminStore store = _FakeSupabaseSchoolAdminStore();
+    final _FakeBackendTeacherAccountService backend =
+        _FakeBackendTeacherAccountService();
+    final ProviderContainer container = ProviderContainer(
+      overrides: [
+        supabaseSchoolAdminStoreProvider.overrideWithValue(store),
+        backendTeacherAccountServiceProvider.overrideWithValue(backend),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await Future<void>.delayed(Duration.zero);
+
+    await container
+        .read(schoolAdminProvider.notifier)
+        .addTeacher(
+          name: 'Asha Mwalimu',
+          email: 'asha@example.com',
+          subjects: <String>['Physics'],
+          assignedClasses: <String>['Form 1 A'],
+          password: 'home099',
+        );
+
+    final List<TeacherAccount> teachers = container
+        .read(schoolAdminProvider)
+        .teachers;
+    expect(backend.createCalls, 1);
+    expect(backend.capturedPassword, 'home099');
+    expect(store.saveTeacherCalls, 0);
+    expect(teachers.single.id, 'backend-teacher-id');
+    expect(teachers.single.email, 'asha@example.com');
+  });
+
   test('theme mode provider switches dark and light modes', () {
     final ProviderContainer container = ProviderContainer();
     addTearDown(container.dispose);
@@ -105,6 +141,70 @@ void main() {
     expect(find.text('Dashboard Overview'), findsNothing);
     expect(find.text('Teacher Dashboard'), findsOneWidget);
   });
+}
+
+class _FakeSupabaseSchoolAdminStore implements SupabaseSchoolAdminStore {
+  int saveTeacherCalls = 0;
+
+  @override
+  bool get isAuthenticated => true;
+
+  @override
+  Future<String> freshAccessToken({bool forceRefresh = false}) async =>
+      forceRefresh ? 'fresh-token' : 'token';
+
+  @override
+  Future<SupabaseSchoolAdminLoadResult> load({
+    required SchoolAdminState fallbackState,
+    UserRole? expectedRole,
+  }) async {
+    return SupabaseSchoolAdminLoadResult(
+      schoolName: fallbackState.schoolName,
+      districtName: fallbackState.districtName,
+      headmasterName: fallbackState.headmasterName,
+      teachers: fallbackState.teachers,
+      resultWindow: fallbackState.resultWindow,
+      settings: fallbackState.settings,
+      studentResults: fallbackState.studentResults,
+      session: fallbackState.session,
+    );
+  }
+
+  @override
+  Future<TeacherAccount> saveTeacher({
+    required TeacherAccount teacher,
+    required String schoolName,
+    required String districtName,
+    String? userId,
+  }) async {
+    saveTeacherCalls++;
+    throw StateError('saveTeacher should not be called during account create.');
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeBackendTeacherAccountService
+    implements BackendTeacherAccountService {
+  int createCalls = 0;
+  String? capturedPassword;
+
+  @override
+  Future<TeacherAccount> createTeacherAccount({
+    required String accessToken,
+    required TeacherAccount teacher,
+    required String password,
+    required String schoolName,
+    required String districtName,
+  }) async {
+    createCalls++;
+    capturedPassword = password;
+    return teacher.copyWith(id: 'backend-teacher-id');
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 Future<void> _pumpDashboard(

@@ -169,6 +169,11 @@ class SupabaseAdminService:
             existing_teacher_user_id = (
                 str(existing_teacher.get("user_id") or "") if existing_teacher else ""
             )
+            existing_email_profile = self._fetch_single(
+                "users",
+                filters={"email": email},
+                select="id,email,role,school_name,district_name,profile",
+            )
 
             metadata = _teacher_metadata(
                 name=payload.name,
@@ -184,6 +189,17 @@ class SupabaseAdminService:
 
             if existing_teacher_user_id:
                 user_id = existing_teacher_user_id
+            elif existing_email_profile is not None:
+                if not _is_compatible_teacher_profile(
+                    existing_email_profile,
+                    email=email,
+                    school_name=school_name,
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="This email belongs to another application user.",
+                    )
+                user_id = str(existing_email_profile.get("id") or "")
             else:
                 try:
                     auth_response = self.client.auth.admin.create_user(

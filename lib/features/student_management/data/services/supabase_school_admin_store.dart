@@ -57,21 +57,21 @@ class _TeacherAccountCreateRequest {
   final bool isActive;
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'email': email,
-        'password': password,
-        'school_name': schoolName,
-        'district_name': districtName,
-        'subject': subject,
-        'assigned_class': assignedClass,
-        'subjects': subjects,
-        'assigned_classes': assignedClasses,
-        'can_upload_results': canUploadResults,
-        'can_edit_results': canEditResults,
-        'can_register_students': canRegisterStudents,
-        'can_download_results': canDownloadResults,
-        'is_active': isActive,
-      };
+    'name': name,
+    'email': email,
+    'password': password,
+    'school_name': schoolName,
+    'district_name': districtName,
+    'subject': subject,
+    'assigned_class': assignedClass,
+    'subjects': subjects,
+    'assigned_classes': assignedClasses,
+    'can_upload_results': canUploadResults,
+    'can_edit_results': canEditResults,
+    'can_register_students': canRegisterStudents,
+    'can_download_results': canDownloadResults,
+    'is_active': isActive,
+  };
 }
 
 @immutable
@@ -317,7 +317,7 @@ class SupabaseSchoolAdminStore {
     required TeacherAccount teacher,
     required String schoolName,
     required String districtName,
-    String? userId,  // kept for compatibility but not used by backend
+    String? userId, // kept for compatibility but not used by backend
   }) async {
     // Backend requires a password. Generate a temporary one and require teacher
     // to reset on first login. In production, ask headmaster for password via UI.
@@ -341,7 +341,7 @@ class SupabaseSchoolAdminStore {
     );
 
     final responseData = await _postRequest(
-      endpoint: 'admin/teachers',
+      endpoint: 'api/v1/admin/teachers',
       body: request.toJson(),
     );
 
@@ -355,7 +355,9 @@ class SupabaseSchoolAdminStore {
       canUploadResults: responseData['can_upload_results'] ?? true,
       canEditResults: responseData['can_edit_results'] ?? true,
       subjects: List<String>.from(responseData['subjects'] ?? []),
-      assignedClasses: List<String>.from(responseData['assigned_classes'] ?? []),
+      assignedClasses: List<String>.from(
+        responseData['assigned_classes'] ?? [],
+      ),
       canRegisterStudents: responseData['can_register_students'] ?? true,
       canDownloadResults: responseData['can_download_results'] ?? true,
       isActive: responseData['is_active'] ?? true,
@@ -364,8 +366,12 @@ class SupabaseSchoolAdminStore {
 
   String _generateRandomPassword() {
     // Generate a 12-character alphanumeric + symbol password
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#%&*?';
-    return List.generate(12, (_) => chars[DateTime.now().microsecond % chars.length]).join();
+    const chars =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#%&*?';
+    return List.generate(
+      12,
+      (_) => chars[DateTime.now().microsecond % chars.length],
+    ).join();
   }
 
   Future<void> deleteTeacher(String teacherId) async {
@@ -778,7 +784,7 @@ class SupabaseSchoolAdminStore {
       throw StateError('District name cannot be empty.');
     }
     return _postRequest(
-      endpoint: 'admin/districts',
+      endpoint: 'api/v1/admin/districts',
       body: <String, dynamic>{'name': districtName.trim()},
     );
   }
@@ -791,7 +797,7 @@ class SupabaseSchoolAdminStore {
       throw StateError('School name cannot be empty.');
     }
     return _postRequest(
-      endpoint: 'admin/schools',
+      endpoint: 'api/v1/admin/schools',
       body: <String, dynamic>{
         'district_name': districtId,
         'name': schoolName.trim(),
@@ -808,7 +814,7 @@ class SupabaseSchoolAdminStore {
       throw StateError('Class name cannot be empty.');
     }
     return _postRequest(
-      endpoint: 'admin/classes',
+      endpoint: 'api/v1/admin/classes',
       body: <String, dynamic>{
         'district_name': districtId,
         'school_name': schoolId,
